@@ -27,6 +27,8 @@ instance Show Command where
 
 type Store = State (Map.Map String Literal)
 
+type Config = (Map.Map String Literal, [String])
+
 evalPlus :: Expr -> Expr -> Store Expr
 evalPlus (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitInt (l1 + l2)
 evalPlus (LitExpr l1) l2 = do
@@ -93,6 +95,17 @@ evalCommand' Done = return Done
 evalCommand' c = do
     c' <- evalCommand c
     evalCommand' c'
+
+-- Initial configuration in the while language)
+initialConfig :: Config
+initialConfig = (Map.empty, [])
+
+-- Definitial interpreter for the while language.
+definterp :: Command -> Config -> Config
+definterp (store, out) c = (newstore, out ++ newout) 
+    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) store
+
+-- whileLang = (Command, Config, initialConfig, definterp)
 
 
 -- Below are some helpers to create a Command and fully evaluate it.
