@@ -25,11 +25,12 @@ instance Show Command where
     show (Seq c1 c2) = "Seq(" ++ (show c1) ++ ", " ++ (show c2) ++ ")"
     show (While e1 e2 c) = "While(" ++ (show e2) ++ "){ " ++ (show c) ++ " }"
 
-type Store = State (Map.Map String Literal)
+type Store = Map.Map String Literal
+type StoreM = State Store
+type Output = [String]
+data Config = Config { cfg_store :: Store, cfg_output :: Output } deriving (Show)
 
-type Config = (Map.Map String Literal, [String])
-
-evalPlus :: Expr -> Expr -> Store Expr
+evalPlus :: Expr -> Expr -> StoreM Expr
 evalPlus (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitInt (l1 + l2)
 evalPlus (LitExpr l1) l2 = do
     l2' <- evalExpr l2
@@ -38,7 +39,7 @@ evalPlus l1 l2 = do
     l1' <- evalExpr l1
     return (Plus l1' l2)
 
-evalLeq :: Expr -> Expr -> Store Expr
+evalLeq :: Expr -> Expr -> StoreM Expr
 evalLeq (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitBool (l1 <= l2)
 evalLeq (LitExpr l1) e2 = do
     e2' <- evalExpr e2
@@ -47,7 +48,7 @@ evalLeq e1 e2 = do
     e1' <- evalExpr e1
     return (Leq e1' e2)
 
-evalExpr :: Expr -> Store Expr
+evalExpr :: Expr -> StoreM Expr
 evalExpr (LitExpr e) = return $ LitExpr e
 evalExpr (Plus e1 e2) = evalPlus e1 e2
 evalExpr (Leq e1 e2) = evalLeq e1 e2
@@ -58,19 +59,19 @@ evalExpr (Id s) = do
         Just lit -> return $ LitExpr lit
         Nothing -> error $ "Invalid Id: " ++ s
 
-evalExpr' :: Expr -> Store Expr
+evalExpr' :: Expr -> StoreM Expr
 evalExpr' (LitExpr e) = return $ LitExpr e
 evalExpr' e = do
     e' <- evalExpr e
     evalExpr' e'
 
-store :: String -> Expr -> Store Command
+store :: String -> Expr -> StoreM Command
 store s (LitExpr l) = do
     lut <- get
     put $ Map.insert s l lut
     return Done
 
-evalCommand :: Command -> WriterT [String] Store Command
+evalCommand :: Command -> WriterT [String] StoreM Command
 evalCommand (Print e) = do
     x <- (lift . evalExpr') e
     tell $ [(show x)]
@@ -90,7 +91,7 @@ evalCommand (While e1 e2 c) = do
     return $ While e1' e2 c
 
 
-evalCommand' :: Command -> WriterT [String] Store Command
+evalCommand' :: Command -> WriterT [String] StoreM Command
 evalCommand' Done = return Done
 evalCommand' c = do
     c' <- evalCommand c
@@ -98,12 +99,12 @@ evalCommand' c = do
 
 -- Initial configuration in the while language)
 initialConfig :: Config
-initialConfig = (Map.empty, [])
+initialConfig = Config {cfg_store = Map.empty, cfg_output = []}
 
 -- Definitial interpreter for the while language.
 definterp :: Command -> Config -> Config
-definterp (store, out) c = (newstore, out ++ newout) 
-    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) store
+definterp c cfg = cfg {cfg_store = newstore, cfg_output = (cfg_output cfg) ++ newout}
+    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfg_store cfg)
 
 -- whileLang = (Command, Config, initialConfig, definterp)
 
