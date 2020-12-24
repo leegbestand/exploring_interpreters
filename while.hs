@@ -114,7 +114,7 @@ definterp c cfg = cfg {cfg_store = newstore, cfg_output = (cfg_output cfg) ++ ne
 -- ghci> let x = wprint (intToExpr 10) `wseq` (wprint (intToExpr 100) `wseq` wprint (intToExpr 200))
 -- ghci> runCommand' x
 -- ["10","100","200"]
--- ghci> 
+-- ghci>
 runCommand :: Command -> IO()
 runCommand c = do
     let ((_, output), _) = runState (runWriterT (evalCommand' c)) Map.empty
@@ -144,3 +144,22 @@ assign s e = Assign s e
 
 wseq :: Command -> Command -> Command
 wseq c1 c2 = Seq c1 c2
+
+
+-- TODO: move to own module.
+-- Currently uses a list(stack) as the execution graph.
+data ExploringInt programs configs = ExploringInt { expl_definterp :: programs -> configs -> configs, expl_config :: configs, exec_graph :: [configs]}
+
+-- Constructor for a exploring interpreter.
+buildExplInt :: (a -> b -> b) -> b -> ExploringInt a b
+buildExplInt definterp conf = ExploringInt {expl_definterp = definterp, expl_config = conf , exec_graph = [conf]}
+
+explore :: ExploringInt p c -> p -> ExploringInt p c
+explore int prog = int { expl_config = newconfig, exec_graph = (exec_graph int) ++ [newconfig]}
+    where newconfig = (expl_definterp int) prog (expl_config int)
+
+
+type WhileExploringInt = ExploringInt Command Config
+
+whileExplorer :: WhileExploringInt
+whileExplorer = buildExplInt (definterp) (initialConfig)
