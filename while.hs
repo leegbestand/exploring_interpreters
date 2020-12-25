@@ -28,7 +28,7 @@ instance Show Command where
 type Store = Map.Map String Literal
 type StoreM = State Store
 type Output = [String]
-data Config = Config { cfg_store :: Store, cfg_output :: Output } deriving (Show)
+data Config = Config { cfg_store :: Store, cfg_output :: Output } deriving (Show, Eq)
 
 evalPlus :: Expr -> Expr -> StoreM Expr
 evalPlus (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitInt (l1 + l2)
@@ -148,15 +148,30 @@ wseq c1 c2 = Seq c1 c2
 
 -- TODO: move to own module.
 -- Currently uses a list(stack) as the execution graph.
-data ExploringInt programs configs = ExploringInt { expl_definterp :: programs -> configs -> configs, expl_config :: configs, exec_graph :: [configs]}
+data ExploringInt programs configs = ExploringInt { expl_definterp :: programs -> configs -> configs, expl_config :: configs, exec_graph :: [(configs, programs)]}
 
 -- Constructor for a exploring interpreter.
 buildExplInt :: (a -> b -> b) -> b -> ExploringInt a b
-buildExplInt definterp conf = ExploringInt {expl_definterp = definterp, expl_config = conf , exec_graph = [conf]}
+buildExplInt definterp conf = ExploringInt {expl_definterp = definterp, expl_config = conf , exec_graph = []}
 
 explore :: ExploringInt p c -> p -> ExploringInt p c
-explore int prog = int { expl_config = newconfig, exec_graph = (exec_graph int) ++ [newconfig]}
-    where newconfig = (expl_definterp int) prog (expl_config int)
+explore int prog = int { expl_config = newconfig, exec_graph = (exec_graph int) ++ [(oldconfig, prog)]}
+    where oldconfig = (expl_config int)
+          newconfig = (expl_definterp int) prog oldconfig
+
+displayEdge :: Show c => Show p => (c, p) ->  String
+displayEdge (c1, p) = (show c1) ++ "\n" ++ "|\n" ++ "|\n| " ++ (show p) ++ "\n|\n|\nv\n"
+
+display :: Show c => Show p => ExploringInt p c -> IO ()
+display explorer = case (exec_graph explorer) of
+    [] -> print (expl_config explorer)
+    _ -> putStrLn $ concat (map displayEdge (exec_graph explorer)) ++ (show (expl_config explorer))
+
+
+revert :: Eq c => ExploringInt p c -> c -> ExploringInt p c
+revert explorer newconfig = explorer { expl_config = newconfig, exec_graph = newgraph }
+    where newgraph = if length prunedGraph == length (exec_graph explorer) then [] else prunedGraph 
+          prunedGraph = takeWhile (\(c, _) -> c /= newconfig) (exec_graph explorer)
 
 
 type WhileExploringInt = ExploringInt Command Config
