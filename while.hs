@@ -4,6 +4,7 @@ import qualified Data.Map as Map
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
+import ExploringStack as Estack
 
 data Literal = LitBool Bool | LitInt Integer deriving (Eq)
 instance Show Literal where
@@ -12,23 +13,23 @@ instance Show Literal where
 
 data Expr = Leq Expr Expr | Plus Expr Expr | LitExpr Literal | Id String
 instance Show Expr where
-    show (Leq e1 e2) = (show e1) ++ "<=" ++ (show e2)
-    show (Plus e1 e2) = (show e1) ++ "+" ++ (show e2)
+    show (Leq e1 e2) = show e1 ++ "<=" ++ show e2
+    show (Plus e1 e2) = show e1 ++ "+" ++ show e2
     show (LitExpr lit) = show lit
     show (Id s) = show s
 
 data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done
 instance Show Command where
-    show (Print e1) = "Print(" ++ (show e1) ++ ")"
-    show (Done) = "Done"
-    show (Assign s e) = (show s) ++ " = " ++ (show e)
-    show (Seq c1 c2) = "Seq(" ++ (show c1) ++ ", " ++ (show c2) ++ ")"
-    show (While e1 e2 c) = "While(" ++ (show e2) ++ "){ " ++ (show c) ++ " }"
+    show (Print e1) = "Print(" ++ show e1 ++ ")"
+    show Done = "Done"
+    show (Assign s e) = show s ++ " = " ++ show e
+    show (Seq c1 c2) = "Seq(" ++ show c1 ++ ", " ++ show c2 ++ ")"
+    show (While e1 e2 c) = "While(" ++ show e2 ++ "){ " ++ show c ++ " }"
 
 type Store = Map.Map String Literal
 type StoreM = State Store
 type Output = [String]
-data Config = Config { cfg_store :: Store, cfg_output :: Output } deriving (Show, Eq)
+data Config = Config { cfgStore :: Store, cfgOutput :: Output } deriving (Show, Eq)
 
 evalPlus :: Expr -> Expr -> StoreM Expr
 evalPlus (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitInt (l1 + l2)
@@ -74,12 +75,11 @@ store s (LitExpr l) = do
 evalCommand :: Command -> WriterT [String] StoreM Command
 evalCommand (Print e) = do
     x <- (lift . evalExpr') e
-    tell $ [(show x)]
+    tell [show x]
     return Done
 evalCommand (Assign id e) = do
     lit <- (lift . evalExpr') e
-    c <- lift $ store id lit
-    return c
+    lift $ store id lit
 evalCommand (Seq Done c2) = return c2
 evalCommand (Seq c1 c2) = do
     c1' <- evalCommand c1
@@ -99,12 +99,12 @@ evalCommand' c = do
 
 -- Initial configuration in the while language)
 initialConfig :: Config
-initialConfig = Config {cfg_store = Map.empty, cfg_output = []}
+initialConfig = Config {cfgStore = Map.empty, cfgOutput = []}
 
 -- Definitial interpreter for the while language.
 definterp :: Command -> Config -> Config
-definterp c cfg = cfg {cfg_store = newstore, cfg_output = (cfg_output cfg) ++ newout}
-    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfg_store cfg)
+definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
+    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
 -- whileLang = (Command, Config, initialConfig, definterp)
 
@@ -122,59 +122,31 @@ runCommand c = do
 
 
 intToExpr :: Integer -> Expr
-intToExpr = (LitExpr . LitInt)
+intToExpr = LitExpr . LitInt
 
 boolToExpr :: Bool -> Expr
-boolToExpr = (LitExpr . LitBool)
+boolToExpr = LitExpr . LitBool
 
 while ::  Expr -> Command -> Command
-while e c = While e e c
+while e = While e e
 
 leq :: Expr -> Expr -> Expr
-leq e1 e2 = Leq e1 e2
+leq = Leq
 
 wprint :: Expr -> Command
-wprint c = Print c
+wprint = Print
 
 plus :: Expr -> Expr -> Expr
-plus e1 e2 = Plus e1 e2
+plus = Plus
 
 assign :: String -> Expr -> Command
-assign s e = Assign s e
+assign = Assign
 
 wseq :: Command -> Command -> Command
-wseq c1 c2 = Seq c1 c2
+wseq = Seq
 
 
--- TODO: move to own module.
--- Currently uses a list(stack) as the execution graph.
-data ExploringInt programs configs = ExploringInt { expl_definterp :: programs -> configs -> configs, expl_config :: configs, exec_graph :: [(configs, programs)]}
+type WhileExplorer = Estack.Explorer Command Config
 
--- Constructor for a exploring interpreter.
-buildExplInt :: (a -> b -> b) -> b -> ExploringInt a b
-buildExplInt definterp conf = ExploringInt {expl_definterp = definterp, expl_config = conf , exec_graph = []}
-
-explore :: ExploringInt p c -> p -> ExploringInt p c
-explore int prog = int { expl_config = newconfig, exec_graph = (exec_graph int) ++ [(oldconfig, prog)]}
-    where oldconfig = (expl_config int)
-          newconfig = (expl_definterp int) prog oldconfig
-
-displayEdge :: Show c => Show p => (c, p) ->  String
-displayEdge (c1, p) = (show c1) ++ "\n" ++ "|\n" ++ "|\n| " ++ (show p) ++ "\n|\n|\nv\n"
-
-display :: Show c => Show p => ExploringInt p c -> IO ()
-display explorer = case (exec_graph explorer) of
-    [] -> print (expl_config explorer)
-    _ -> putStrLn $ concat (map displayEdge (exec_graph explorer)) ++ (show (expl_config explorer))
-
-
-revert :: Eq c => ExploringInt p c -> c -> ExploringInt p c
-revert explorer newconfig = explorer { expl_config = newconfig, exec_graph = newgraph }
-    where newgraph = if length prunedGraph == length (exec_graph explorer) then [] else prunedGraph 
-          prunedGraph = takeWhile (\(c, _) -> c /= newconfig) (exec_graph explorer)
-
-
-type WhileExploringInt = ExploringInt Command Config
-
-whileExplorer :: WhileExploringInt
-whileExplorer = buildExplInt (definterp) (initialConfig)
+whileExplorer :: WhileExplorer
+whileExplorer = build definterp initialConfig
