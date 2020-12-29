@@ -5,20 +5,21 @@ import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
 import ExploringStack as Estack
+import ExploringGraph as Egraph
 
 data Literal = LitBool Bool | LitInt Integer deriving (Eq)
 instance Show Literal where
     show (LitBool b) = show b
     show (LitInt i) = show i
 
-data Expr = Leq Expr Expr | Plus Expr Expr | LitExpr Literal | Id String
+data Expr = Leq Expr Expr | Plus Expr Expr | LitExpr Literal | Id String deriving (Eq)
 instance Show Expr where
     show (Leq e1 e2) = show e1 ++ "<=" ++ show e2
     show (Plus e1 e2) = show e1 ++ "+" ++ show e2
     show (LitExpr lit) = show lit
     show (Id s) = show s
 
-data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done
+data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done deriving (Eq)
 instance Show Command where
     show (Print e1) = "Print(" ++ show e1 ++ ")"
     show Done = "Done"
@@ -147,6 +148,10 @@ wseq = Seq
 
 
 type WhileExplorer = Estack.Explorer Command Config
+type WhileGraphExporer = Egraph.Explorer Command Config
 
 whileExplorer :: WhileExplorer
-whileExplorer = build definterp initialConfig
+whileExplorer = Estack.build definterp initialConfig
+
+whileGraphExporer :: WhileGraphExporer
+whileGraphExporer = Egraph.build definterp initialConfig
