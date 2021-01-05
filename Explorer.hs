@@ -1,6 +1,6 @@
 module Explorer where
 
-import Data.Graph.Inductive.   Graph 
+import Data.Graph.Inductive.Graph 
 import Data.Graph.Inductive.PatriciaTree
 import Data.Graph.Inductive.Query
 
@@ -79,6 +79,25 @@ revert e r = case IntMap.lookup r (cmap e) of
     Just c -> revert' e (r, c)
     Nothing -> e -- For now do nothing on revert to non-existing Ref.
 
+displayDotEdge :: Show v => Show e => (v, v, e) -> IO ()
+displayDotEdge (s, t, e) = do
+    putStr (show s)
+    putStr " -> "
+    putStr (show t)
+    putStr "[label="
+    putStr $ show (show e)
+    putStrLn "]"
+
+displayDotVertices :: Ref -> Node -> IO ()
+displayDotVertices r n = if n == r then putStrLn ((show n) ++ " [shape=box]") else putStrLn (show n)
+    
+
+displayDot :: Show p => Explorer p c  -> IO ()
+displayDot g = do
+    putStrLn "digraph g {"
+    mapM_ (displayDotVertices (currRef g)) (nodes (execEnv g))
+    mapM_ displayDotEdge (labEdges (execEnv g))
+    putStrLn "}"
 
 display :: Show p => Explorer p c -> IO ()
 display e = prettyPrint (execEnv e)

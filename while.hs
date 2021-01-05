@@ -16,13 +16,13 @@ instance Show Expr where
     show (Leq e1 e2) = show e1 ++ "<=" ++ show e2
     show (Plus e1 e2) = show e1 ++ "+" ++ show e2
     show (LitExpr lit) = show lit
-    show (Id s) = show s
+    show (Id s) = s
 
 data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done deriving (Eq)
 instance Show Command where
     show (Print e1) = "Print(" ++ show e1 ++ ")"
     show Done = "Done"
-    show (Assign s e) = show s ++ " = " ++ show e
+    show (Assign s e) = s ++ " = " ++ show e
     show (Seq c1 c2) = "Seq(" ++ show c1 ++ ", " ++ show c2 ++ ")"
     show (While e1 e2 c) = "While(" ++ show e2 ++ "){ " ++ show c ++ " }"
 
