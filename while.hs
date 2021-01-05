@@ -4,8 +4,7 @@ import qualified Data.Map as Map
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
-import ExploringStack as Estack
-import ExploringGraph as Egraph
+import Explorer as E
 
 data Literal = LitBool Bool | LitInt Integer deriving (Eq)
 instance Show Literal where
@@ -147,11 +146,13 @@ wseq :: Command -> Command -> Command
 wseq = Seq
 
 
-type WhileExplorer = Estack.Explorer Command Config
-type WhileGraphExporer = Egraph.Explorer Command Config
+type WhileExplorer = E.Explorer Command Config
 
 whileExplorer :: WhileExplorer
-whileExplorer = Estack.build definterp initialConfig
+whileExplorer = E.build Structural False definterp initialConfig
 
-whileGraphExporer :: WhileGraphExporer
-whileGraphExporer = Egraph.build definterp initialConfig
+whileNonShared :: WhileExplorer
+whileNonShared = E.build Reference False definterp initialConfig
+
+whileBacktrack :: WhileExplorer 
+whileBacktrack = E.build Reference True definterp initialConfig
