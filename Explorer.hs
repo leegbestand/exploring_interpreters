@@ -1,6 +1,6 @@
 module Explorer where
 
-import Data.Graph.Inductive.Graph 
+import Data.Graph.Inductive.   Graph 
 import Data.Graph.Inductive.PatriciaTree
 import Data.Graph.Inductive.Query
 
@@ -64,15 +64,12 @@ execute e p = case findRef e newconf of
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
--- This exploits the structure in Nosharing + Backtracking 
--- and does not work with Sharing + Backtracking
 revert'' :: Explorer p c -> (Ref, c) -> Explorer p c
-revert'' e (r, c) = e { execEnv = execEnv'', currRef = r, config = c , cmap = cmap'}
-    where toDelete  = reachable r (execEnv e) \\ [r]
-          execEnv'  = delNodes  toDelete (execEnv e)
-          sucs      = suc execEnv' r
-          execEnv'' = delEdges (map (\n -> (r, n)) sucs) execEnv'
-          cmap'     = deleteMap toDelete (cmap e)
+revert'' e (r, c) = e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
+    where nodesToDel = reachable r (execEnv e) \\ [r]
+          edgesToDel = filter (\(s, t) -> s `elem` nodesToDel || t `elem` nodesToDel) (edges (execEnv e))
+          execEnv'   = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
+          cmap'      = deleteMap nodesToDel (cmap e)
 
 revert' :: Explorer p c -> (Ref, c) -> Explorer p c
 revert'  e (r, c) = if backTracking e then revert'' e (r, c) else e { currRef = r, config = c }
