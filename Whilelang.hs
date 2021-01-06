@@ -1,6 +1,7 @@
 module Whilelang where
 
 import qualified Data.Map as Map
+import Data.List
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
@@ -30,6 +31,9 @@ type Store = Map.Map String Literal
 type StoreM = State Store
 type Output = [String]
 data Config = Config { cfgStore :: Store, cfgOutput :: Output } deriving (Show, Eq)
+
+type WhileExplorer = E.Explorer Command Config
+
 
 evalPlus :: Expr -> Expr -> StoreM Expr
 evalPlus (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitInt (l1 + l2)
@@ -107,6 +111,20 @@ definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
 -- whileLang = (Command, Config, initialConfig, definterp)
+--
+printOut :: Output -> IO ()
+printOut out = if out == [] then return () else mapM_ putStrLn out
+
+repl :: WhileExplorer -> Command -> IO WhileExplorer
+repl e (Seq c1 c2)= do
+    e' <- repl e c1
+    repl e' c2
+repl e p = do
+    let c = (config e)
+    let e' = execute e p
+    let c' = (config e')
+    printOut (cfgOutput c' \\ cfgOutput c)
+    return e'
 
 
 -- Below are some helpers to create a Command and fully evaluate it.
@@ -146,7 +164,6 @@ wseq :: Command -> Command -> Command
 wseq = Seq
 
 
-type WhileExplorer = E.Explorer Command Config
 
 whileExplorer :: WhileExplorer
 whileExplorer = E.build Structural False definterp initialConfig
