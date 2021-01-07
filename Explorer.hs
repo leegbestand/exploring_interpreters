@@ -56,7 +56,7 @@ execute e p = case findRef e newconf of
         Structural -> if hasLEdge (execEnv e) (currRef e, r, p) 
                       then e { config = newconf, currRef = r }
                       else e { config = newconf, currRef = r, execEnv = insEdge (currRef e, r, p) (execEnv e) }
-        Reference -> handleRef e p (r, newconf)
+        Reference -> addNewPath e p newconf
     Nothing -> addNewPath e p newconf
     where newconf = defInterp e p (config e)
 
