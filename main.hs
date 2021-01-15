@@ -9,7 +9,7 @@ backTrackAssign :: Command
 backTrackAssign = Seq (Assign "x" (intToExpr 1)) (Assign "x" (intToExpr 2))
 
 backTrackAssign' :: Command
-backTrackAssign' = Assign "x" (intToExpr 2)
+backTrackAssign' = Assign "x" (intToExpr 1)
 
 outputTest :: Command
 outputTest = wprint (intToExpr 10) `wseq` (wprint (intToExpr 100) `wseq` wprint (intToExpr 200))
@@ -44,12 +44,18 @@ showOutput = do
 showBacktracking :: IO ()
 showBacktracking = do
     explorer' <- repl backtracking backTrackAssign 
-    explorer'' <- repl (revert explorer' 2) backTrackAssign'
+    let explorer'' = case revert explorer' 3 of
+                    Just c  -> c
+                    Nothing -> error "No valid ref" 
+    explorer''' <- repl explorer'' backTrackAssign'
     displayDot explorer''
                     
 -- With no backtracking, node 2 will have 2 children.
 showNoBacktracking :: IO ()
 showNoBacktracking = do
     explorer' <- repl reference backTrackAssign 
-    explorer'' <- repl (revert explorer' 2) backTrackAssign'
+    let explorer'' = case revert explorer' 3 of
+                    Just c  -> c
+                    Nothing -> explorer'
+    explorer''' <- repl explorer'' backTrackAssign'
     displayDot explorer''

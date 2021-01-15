@@ -21,11 +21,11 @@ instance Show Expr where
 
 data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done deriving (Eq)
 instance Show Command where
-    show (Print e1) = "Print(" ++ show e1 ++ ")"
+    show (Print e1) = "print(" ++ show e1 ++ ")"
     show Done = "Done"
     show (Assign s e) = s ++ " = " ++ show e
-    show (Seq c1 c2) = "Seq(" ++ show c1 ++ ", " ++ show c2 ++ ")"
-    show (While e1 e2 c) = "While(" ++ show e2 ++ "){ " ++ show c ++ " }"
+    show (Seq c1 c2) = "seq(" ++ show c1 ++ ", " ++ show c2 ++ ")"
+    show (While e1 e2 c) = "while(" ++ show e2 ++ ") do " ++ show c ++ " od"
 
 type Store = Map.Map String Literal
 type StoreM = State Store
@@ -165,11 +165,15 @@ wseq = Seq
 
 
 
-whileExplorer :: WhileExplorer
-whileExplorer = E.build Structural False definterp initialConfig
+whileGraph :: WhileExplorer
+whileGraph = E.build Structural False definterp initialConfig
 
-whileNonShared :: WhileExplorer
-whileNonShared = E.build Reference False definterp initialConfig
+whileTree :: WhileExplorer
+whileTree = E.build Reference False definterp initialConfig
 
-whileBacktrack :: WhileExplorer 
-whileBacktrack = E.build Reference True definterp initialConfig
+whileStack :: WhileExplorer 
+whileStack = E.build Reference True definterp initialConfig
+
+whileExample = while (Leq (Id "x") (intToExpr 10)) (Seq (Assign "x" (Plus (Id "x") (intToExpr 1))) (Print (Id "x")))
+
+zero = intToExpr 0

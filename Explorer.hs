@@ -51,33 +51,29 @@ handleRef e p (r, c) = if (currRef e, r, p) `elem` out (execEnv e) (currRef e)
     else addNewPath e p c
 
 execute :: Eq c => Eq p => Explorer p c -> p -> Explorer p c
-execute e p = case findRef e newconf of
-    Just (r, c) -> case equality e of
-        Structural -> if hasLEdge (execEnv e) (currRef e, r, p) 
-                      then e { config = newconf, currRef = r }
-                      else e { config = newconf, currRef = r, execEnv = insEdge (currRef e, r, p) (execEnv e) }
-        Reference -> addNewPath e p newconf
-    Nothing -> addNewPath e p newconf
+execute e p = case equality e of 
+    Structural -> case findRef e newconf of
+        Just (r, c) -> if hasLEdge (execEnv e) (currRef e, r, p) 
+                        then e { config = newconf, currRef = r }
+                        else e { config = newconf, currRef = r, execEnv = insEdge (currRef e, r, p) (execEnv e) }
+        Nothing -> addNewPath e p newconf
+    Reference -> addNewPath e p newconf
     where newconf = defInterp e p (config e)
 
     
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
-revert'' :: Explorer p c -> (Ref, c) -> Explorer p c
-revert'' e (r, c) = e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
+revert :: Explorer p c -> Ref -> Maybe (Explorer p c)
+revert e r = case IntMap.lookup r (cmap e) of
+    Just c | backTracking e -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
+           | otherwise      -> Just e { currRef = r, config = c }
+    Nothing                 -> Nothing
     where nodesToDel = reachable r (execEnv e) \\ [r]
           edgesToDel = filter (\(s, t) -> s `elem` nodesToDel || t `elem` nodesToDel) (edges (execEnv e))
           execEnv'   = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
           cmap'      = deleteMap nodesToDel (cmap e)
 
-revert' :: Explorer p c -> (Ref, c) -> Explorer p c
-revert'  e (r, c) = if backTracking e then revert'' e (r, c) else e { currRef = r, config = c }
-
-revert :: Explorer p c -> Ref -> Explorer p c
-revert e r = case IntMap.lookup r (cmap e) of
-    Just c -> revert' e (r, c)
-    Nothing -> e -- For now do nothing on revert to non-existing Ref.
 
 displayDotEdge :: Show v => Show e => (v, v, e) -> IO ()
 displayDotEdge (s, t, e) = do
@@ -99,5 +95,11 @@ displayDot g = do
     mapM_ displayDotEdge (labEdges (execEnv g))
     putStrLn "}"
 
-display :: Show p => Explorer p c -> IO ()
-display e = prettyPrint (execEnv e)
+
+display :: Show p => Explorer p c -> String
+display e = "{\n\"edges\": \"" ++ show (labEdges (execEnv e)) ++ "\",\n"
+          ++ "\"vertices\": \"" ++ show (nodes (execEnv e)) ++ "\",\n"
+          ++ "\"current\": \"" ++ (show (currRef e)) ++ "\"\n"
+          ++ "}"
+--display e = 
+
