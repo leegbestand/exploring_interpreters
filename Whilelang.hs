@@ -112,20 +112,22 @@ definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
 
 -- whileLang = (Command, Config, initialConfig, definterp)
 --
-printOut :: Output -> IO ()
-printOut out = if out == [] then return () else mapM_ putStrLn out
-
-repl :: WhileExplorer -> Command -> IO WhileExplorer
-repl e (Seq c1 c2)= do
-    e' <- repl e c1
-    repl e' c2
-repl e p = do
-    let c = (config e)
+do_ :: Command -> WhileExplorer -> IO WhileExplorer
+do_ (Seq c1 c2) e = do_ c1 e >>= do_ c2
+do_ p e = do
     let e' = execute e p
-    let c' = (config e')
-    printOut (cfgOutput c' \\ cfgOutput c)
+    putStr $ unlines $ cfgOutput (config e) \\ cfgOutput (config e')
     return e'
 
+start :: IO WhileExplorer
+start = return whileStack
+
+session1 :: IO ()
+session1 = start >>=
+  do_ (assign "x" (intToExpr 1)) >>= 
+  do_ (assign "y" (Id "x")) >>= 
+  do_ (Print (Id "y")) >>=
+  displayDot 
 
 -- Below are some helpers to create a Command and fully evaluate it.
 -- Example:
