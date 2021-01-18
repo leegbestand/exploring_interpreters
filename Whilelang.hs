@@ -116,7 +116,7 @@ do_ :: Command -> WhileExplorer -> IO WhileExplorer
 do_ (Seq c1 c2) e = do_ c1 e >>= do_ c2
 do_ p e = do
     let e' = execute e p
-    putStr $ unlines $ cfgOutput (config e) \\ cfgOutput (config e')
+    putStr $ unlines $ cfgOutput (config e') \\ cfgOutput (config e)
     return e'
 
 start :: IO WhileExplorer
