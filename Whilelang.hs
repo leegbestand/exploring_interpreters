@@ -5,7 +5,7 @@ import Data.List
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
-import Explorer as E
+import ExploringInterpreter as E
 
 data Literal = LitBool Bool | LitInt Integer deriving (Eq)
 instance Show Literal where

@@ -1,4 +1,4 @@
-module Explorer where
+module ExploringInterpreter where
 
 import Data.Graph.Inductive.Graph 
 import Data.Graph.Inductive.PatriciaTree
@@ -101,5 +101,4 @@ display e = "{\n\"edges\": \"" ++ show (labEdges (execEnv e)) ++ "\",\n"
           ++ "\"vertices\": \"" ++ show (nodes (execEnv e)) ++ "\",\n"
           ++ "\"current\": \"" ++ (show (currRef e)) ++ "\"\n"
           ++ "}"
---display e = 
 
