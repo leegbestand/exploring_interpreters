@@ -1,4 +1,14 @@
-module ExploringInterpreter where
+module ExploringInterpreter 
+    ( Explorer
+    , execute
+    , revert
+    , displayDot
+    , display
+    , mkExplorerStack
+    , mkExplorerTree
+    , mkExplorerGraph
+    , config
+    ) where
 
 import Data.Graph.Inductive.Graph 
 import Data.Graph.Inductive.PatriciaTree
@@ -9,11 +19,9 @@ import Data.List
 
 type Ref = Int
 
-data Equality = Reference | Structural
-
 data Explorer programs configs = Explorer { 
     -- Currently part of the Data and not the type. See if it possible to make part of the type.
-    equality :: Equality,
+    sharing :: Bool,
     backTracking :: Bool,
     defInterp :: programs -> configs -> configs, 
     config :: configs, -- Cache the config
@@ -24,17 +32,27 @@ data Explorer programs configs = Explorer {
 }
 
 -- Constructor for a exploring interpreter.
-build :: Equality -> Bool -> (a -> b -> b) -> b -> Explorer a b
-build equal backtrack definterp conf = Explorer 
-    { equality = equal
-    , backTracking = backtrack
-    , defInterp = definterp
+mkExplorer :: Bool -> Bool -> (a -> b -> b) -> b -> Explorer a b
+mkExplorer share backtrack definterp conf = Explorer 
+    { defInterp = definterp
     , config = conf
     , genRef = 1 -- Currently generate reference by increasing a counter.
     , currRef = 1
     , cmap = IntMap.fromList [(1, conf)]
     , execEnv = mkGraph [(1, ())] []
+    , sharing = share 
+    , backTracking = backtrack
 }
+
+mkExplorerStack :: (a -> b -> b) -> b -> Explorer a b 
+mkExplorerStack = mkExplorer False True
+
+mkExplorerTree  :: (a -> b -> b) -> b -> Explorer a b 
+mkExplorerTree  = mkExplorer False False
+
+mkExplorerGraph :: (a -> b -> b) -> b -> Explorer a b 
+mkExplorerGraph = mkExplorer True False 
+
 
 findRef :: Eq c => Explorer p c -> c -> Maybe (Ref, c)
 findRef e c = find (\(r, c') -> c' == c) (IntMap.toList (cmap e))
@@ -51,14 +69,18 @@ handleRef e p (r, c) = if (currRef e, r, p) `elem` out (execEnv e) (currRef e)
     else addNewPath e p c
 
 execute :: Eq c => Eq p => Explorer p c -> p -> Explorer p c
-execute e p = case equality e of 
-    Structural -> case findRef e newconf of
-        Just (r, c) -> if hasLEdge (execEnv e) (currRef e, r, p) 
-                        then e { config = newconf, currRef = r }
-                        else e { config = newconf, currRef = r, execEnv = insEdge (currRef e, r, p) (execEnv e) }
-        Nothing -> addNewPath e p newconf
-    Reference -> addNewPath e p newconf
+execute e p = 
+    if sharing e
+        then case findRef e newconf of
+            Just (r, c) -> 
+                if hasLEdge (execEnv e) (currRef e, r, p) 
+                    then e  { config = newconf, currRef = r }
+                    else e  { config = newconf, currRef = r
+                            , execEnv = insEdge (currRef e, r, p) (execEnv e) }
+            Nothing -> addNewPath e p newconf
+        else addNewPath e p newconf
     where newconf = defInterp e p (config e)
+
 
     
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a

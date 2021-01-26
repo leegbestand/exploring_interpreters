@@ -168,13 +168,13 @@ wseq = Seq
 
 
 whileGraph :: WhileExplorer
-whileGraph = E.build Structural False definterp initialConfig
+whileGraph = mkExplorerGraph definterp initialConfig
 
 whileTree :: WhileExplorer
-whileTree = E.build Reference False definterp initialConfig
+whileTree = mkExplorerTree definterp initialConfig
 
 whileStack :: WhileExplorer 
-whileStack = E.build Reference True definterp initialConfig
+whileStack = mkExplorerStack definterp initialConfig
 
 whileExample = while (Leq (Id "x") (intToExpr 10)) (Seq (Assign "x" (Plus (Id "x") (intToExpr 1))) (Print (Id "x")))
 
