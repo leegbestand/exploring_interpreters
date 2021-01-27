@@ -9,6 +9,7 @@ module ExploringInterpreter
     , mkExplorerGraph
     , config
     , currRef
+    , Ref
     ) where
 
 import Data.Graph.Inductive.Graph 
