@@ -1,6 +1,7 @@
 module ExploringInterpreter 
     ( Explorer
     , execute
+    , execute'
     , revert
     , displayDot
     , display
@@ -83,6 +84,8 @@ execute e p =
         else addNewPath e p newconf
     where newconf = defInterp e p (config e)
 
+execute' :: Eq c => Eq p => Explorer p c -> [p] -> Explorer p c
+execute' e ps = foldl execute e ps
 
     
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
@@ -119,10 +122,9 @@ displayDot g = do
     mapM_ displayDotEdge (labEdges (execEnv g))
     putStrLn "}"
 
-
+-- TODO: Aparte display functie.
 display :: Show p => Explorer p c -> String
 display e = "{\n\"edges\": \"" ++ show (labEdges (execEnv e)) ++ "\",\n"
           ++ "\"vertices\": \"" ++ show (nodes (execEnv e)) ++ "\",\n"
           ++ "\"current\": \"" ++ (show (currRef e)) ++ "\"\n"
           ++ "}"
-
