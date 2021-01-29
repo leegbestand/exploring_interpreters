@@ -5,6 +5,8 @@ module ExploringInterpreter
     , revert
     , displayDot
     , display
+    , displayExecEnv
+    , subExecEnv
     , mkExplorerStack
     , mkExplorerTree
     , mkExplorerGraph
@@ -12,6 +14,8 @@ module ExploringInterpreter
     , currRef
     , Ref
     , deref
+    , execEnv
+    , Gr
     ) where
 
 import Data.Graph.Inductive.Graph 
@@ -125,9 +129,18 @@ displayDot g = do
     mapM_ displayDotEdge (labEdges (execEnv g))
     putStrLn "}"
 
--- TODO: Aparte display functie.
+-- TODO: define in terms of displayGr
 display :: Show p => Explorer p c -> String
 display e = "{\n\"edges\": \"" ++ show (labEdges (execEnv e)) ++ "\",\n"
           ++ "\"vertices\": \"" ++ show (nodes (execEnv e)) ++ "\",\n"
           ++ "\"current\": \"" ++ (show (currRef e)) ++ "\"\n"
           ++ "}"
+
+displayExecEnv :: Show p => Gr () p -> String
+displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
+                  ++ "\"vertices\": \"" ++ show (nodes gr) ++ "\",\n"
+                  ++ "}"
+
+
+subExecEnv :: Explorer p c -> Gr () p
+subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)
