@@ -11,6 +11,7 @@ module ExploringInterpreter
     , config
     , currRef
     , Ref
+    , deref
     ) where
 
 import Data.Graph.Inductive.Graph 
@@ -56,6 +57,8 @@ mkExplorerTree  = mkExplorer False False
 mkExplorerGraph :: (a -> b -> b) -> b -> Explorer a b 
 mkExplorerGraph = mkExplorer True False 
 
+deref :: Explorer p c -> Ref -> Maybe c
+deref e r = IntMap.lookup r (cmap e)
 
 findRef :: Eq c => Explorer p c -> c -> Maybe (Ref, c)
 findRef e c = find (\(r, c') -> c' == c) (IntMap.toList (cmap e))
