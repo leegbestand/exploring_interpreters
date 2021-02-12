@@ -24,8 +24,8 @@ instance Show Command where
     show (Print e1) = "print(" ++ show e1 ++ ")"
     show Done = "Done"
     show (Assign s e) = s ++ " = " ++ show e
-    show (Seq c1 c2) = "seq(" ++ show c1 ++ ", " ++ show c2 ++ ")"
-    show (While e1 e2 c) = "while(" ++ show e2 ++ ") do " ++ show c ++ " od"
+    show (Seq c1 c2) = show c1 ++ "\n" ++ show c2
+    show (While e1 e2 c) = "while(" ++ show e2 ++ ") do\n" ++ show c ++ "\nod"
 
 type Store = Map.Map String Literal
 type StoreM = State Store
@@ -110,17 +110,24 @@ definterp :: Command -> Config -> Config
 definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
+definterpM :: Command -> Config -> IO Config
+definterpM c cfg = do
+    print newout
+    return cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
+    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
+
+
 -- whileLang = (Command, Config, initialConfig, definterp)
 --
 do_ :: Command -> WhileExplorer -> IO WhileExplorer
 do_ (Seq c1 c2) e = do_ c1 e >>= do_ c2
 do_ p e = do
-    let e' = execute e p
+    let e' = execute p e
     putStr $ unlines $ cfgOutput (config e') \\ cfgOutput (config e)
     return e'
 
 start :: IO WhileExplorer
-start = return whileStack
+start = return whileGraph
 
 session1 :: IO ()
 session1 = start >>=
@@ -176,6 +183,12 @@ whileTree = mkExplorerTree definterp initialConfig
 whileStack :: WhileExplorer 
 whileStack = mkExplorerStack definterp initialConfig
 
-whileExample = while (Leq (Id "x") (intToExpr 10)) (Seq (Assign "x" (Plus (Id "x") (intToExpr 1))) (Print (Id "x")))
+whileExample = Seq (Assign "x" (intToExpr 0)) (while (Leq (Id "x") (intToExpr 10)) (Seq (Assign "x" (Plus (Id "x") (intToExpr 1))) (Print (Id "x"))))
 
 zero = intToExpr 0
+
+getRef :: WhileExplorer -> Ref
+getRef = currRef
+
+getLast :: WhileExplorer -> Gr () Command
+getLast = subExecEnv

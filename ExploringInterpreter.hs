@@ -1,7 +1,7 @@
 module ExploringInterpreter 
     ( Explorer
     , execute
-    , execute'
+    , executeAll
     , revert
     , displayDot
     , display
@@ -32,6 +32,8 @@ data Explorer programs configs = Explorer {
     sharing :: Bool,
     backTracking :: Bool,
     defInterp :: programs -> configs -> configs, 
+    -- Possible definition for interpM, needs M to be generic.
+    -- defInterpM :: programs -> configs -> IO configs, 
     config :: configs, -- Cache the config
     currRef :: Ref,
     genRef :: Ref,
@@ -78,8 +80,8 @@ handleRef e p (r, c) = if (currRef e, r, p) `elem` out (execEnv e) (currRef e)
     then e { currRef = r, config = c }
     else addNewPath e p c
 
-execute :: Eq c => Eq p => Explorer p c -> p -> Explorer p c
-execute e p = 
+updateConf :: Eq c => Eq p => Explorer p c -> (p, c) -> Explorer p c
+updateConf e (p, newconf) = 
     if sharing e
         then case findRef e newconf of
             Just (r, c) -> 
@@ -89,17 +91,28 @@ execute e p =
                             , execEnv = insEdge (currRef e, r, p) (execEnv e) }
             Nothing -> addNewPath e p newconf
         else addNewPath e p newconf
+
+execute :: Eq c => Eq p =>  p -> Explorer p c -> Explorer p c
+execute p e = updateConf e (p, newconf) 
     where newconf = defInterp e p (config e)
 
-execute' :: Eq c => Eq p => Explorer p c -> [p] -> Explorer p c
-execute' e ps = foldl execute e ps
+executeAll :: (Eq c, Eq p) => [p] -> Explorer p c -> Explorer p c
+executeAll ps e = foldr execute e ps
+
+-- Implementation for execute with Monad, can replace execute if
+-- monads are part of the explorer type.
+{-- executeM :: (Eq c, Eq p) => p -> Explorer p c -> IO (Explorer p c)
+executeM p e  = do
+    c' <- defInterpM e p (config e)
+    return $ updateConf e (p, c')
+--}
 
     
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
-revert :: Explorer p c -> Ref -> Maybe (Explorer p c)
-revert e r = case IntMap.lookup r (cmap e) of
+revert :: Ref -> Explorer p c -> Maybe (Explorer p c)
+revert r e = case IntMap.lookup r (cmap e) of
     Just c | backTracking e -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
            | otherwise      -> Just e { currRef = r, config = c }
     Nothing                 -> Nothing
@@ -140,7 +153,6 @@ displayExecEnv :: Show p => Gr () p -> String
 displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
                   ++ "\"vertices\": \"" ++ show (nodes gr) ++ "\",\n"
                   ++ "}"
-
 
 subExecEnv :: Explorer p c -> Gr () p
 subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)
