@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module ExploringInterpreter 
     ( Explorer
     , execute
@@ -24,25 +26,26 @@ import Data.Graph.Inductive.Query
 
 import qualified Data.IntMap as IntMap
 import Data.List
+import Data.Foldable
 
 type Ref = Int
 
-data Explorer programs configs = Explorer { 
-    -- Currently part of the Data and not the type. See if it possible to make part of the type.
-    sharing :: Bool,
-    backTracking :: Bool,
-    defInterp :: programs -> configs -> configs, 
-    -- Possible definition for interpM, needs M to be generic.
-    -- defInterpM :: programs -> configs -> IO configs, 
-    config :: configs, -- Cache the config
-    currRef :: Ref,
-    genRef :: Ref,
-    cmap :: IntMap.IntMap configs,
-    execEnv :: Gr () programs
-}
+data Explorer programs m configs where
+    Explorer :: (Show programs, Eq programs, Eq configs, Monad m) => 
+        { sharing :: Bool
+        , backTracking :: Bool
+        , defInterp :: programs -> configs -> m configs
+        , config :: configs -- Cache the config
+        , currRef :: Ref
+        , genRef :: Ref
+        , cmap :: IntMap.IntMap configs
+        -- TODO: Make Gr Ref programs
+        , execEnv :: Gr () programs
+        } -> Explorer programs m configs
 
+-- TODO: Put types into variables(if possible?).
 -- Constructor for a exploring interpreter.
-mkExplorer :: Bool -> Bool -> (a -> b -> b) -> b -> Explorer a b
+mkExplorer :: (Show a, Eq a, Eq b, Monad m) => Bool -> Bool -> (a -> b -> m b) -> b -> Explorer a m b
 mkExplorer share backtrack definterp conf = Explorer 
     { defInterp = definterp
     , config = conf
@@ -54,33 +57,33 @@ mkExplorer share backtrack definterp conf = Explorer
     , backTracking = backtrack
 }
 
-mkExplorerStack :: (a -> b -> b) -> b -> Explorer a b 
+mkExplorerStack :: (Show a, Eq a, Eq b, Monad m) => (a -> b -> m b) -> b -> Explorer a m b
 mkExplorerStack = mkExplorer False True
 
-mkExplorerTree  :: (a -> b -> b) -> b -> Explorer a b 
+mkExplorerTree  :: (Show a, Eq a, Eq b, Monad m) => (a -> b -> m b) -> b -> Explorer a m b 
 mkExplorerTree  = mkExplorer False False
 
-mkExplorerGraph :: (a -> b -> b) -> b -> Explorer a b 
+mkExplorerGraph :: (Show a, Eq a, Eq b, Monad m) => (a -> b -> m b) -> b -> Explorer a m b
 mkExplorerGraph = mkExplorer True False 
 
-deref :: Explorer p c -> Ref -> Maybe c
+deref :: Explorer p m c -> Ref -> Maybe c
 deref e r = IntMap.lookup r (cmap e)
 
-findRef :: Eq c => Explorer p c -> c -> Maybe (Ref, c)
+findRef :: Eq c => Explorer p m c -> c -> Maybe (Ref, c)
 findRef e c = find (\(r, c') -> c' == c) (IntMap.toList (cmap e))
 
-addNewPath :: Explorer p c -> p -> c -> Explorer p c
+addNewPath :: Explorer p m c -> p -> c -> Explorer p m c
 addNewPath e p c = e { config = c, currRef = newref, genRef = newref, cmap = IntMap.insert newref c (cmap e),
      execEnv = insNode (newref, ()) $ insEdge (currRef e, newref, p) (execEnv e)}
      where newref = genRef e + 1
 
 -- Check if we already have an edge from the current node, if not create a new one.
-handleRef :: Eq p => Explorer p c -> p -> (Ref, c) -> Explorer p c
+handleRef :: Eq p => Explorer p m c -> p -> (Ref, c) -> Explorer p m c
 handleRef e p (r, c) = if (currRef e, r, p) `elem` out (execEnv e) (currRef e)
     then e { currRef = r, config = c }
     else addNewPath e p c
 
-updateConf :: Eq c => Eq p => Explorer p c -> (p, c) -> Explorer p c
+updateConf :: Eq c => Eq p => Explorer p m c -> (p, c) -> Explorer p m c
 updateConf e (p, newconf) = 
     if sharing e
         then case findRef e newconf of
@@ -92,16 +95,17 @@ updateConf e (p, newconf) =
             Nothing -> addNewPath e p newconf
         else addNewPath e p newconf
 
-execute :: Eq c => Eq p =>  p -> Explorer p c -> Explorer p c
-execute p e = updateConf e (p, newconf) 
-    where newconf = defInterp e p (config e)
+execute :: (Eq c, Eq p, Monad m) =>  p -> Explorer p m c -> m (Explorer p m c)
+execute p e = do
+    newconf <- defInterp e p (config e)
+    return $ updateConf e (p, newconf) 
 
-executeAll :: (Eq c, Eq p) => [p] -> Explorer p c -> Explorer p c
-executeAll ps e = foldr execute e ps
+executeAll :: (Eq c, Eq p, Monad m) => [p] -> Explorer p m c -> m (Explorer p m c)
+executeAll ps e = foldrM execute e ps
 
 -- Implementation for execute with Monad, can replace execute if
 -- monads are part of the explorer type.
-{-- executeM :: (Eq c, Eq p) => p -> Explorer p c -> IO (Explorer p c)
+{-- executeM :: (Eq c, Eq p) => p -> Explorer p m c -> IO (Explorer p m c)
 executeM p e  = do
     c' <- defInterpM e p (config e)
     return $ updateConf e (p, c')
@@ -111,7 +115,7 @@ executeM p e  = do
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
-revert :: Ref -> Explorer p c -> Maybe (Explorer p c)
+revert :: Ref -> Explorer p m c -> Maybe (Explorer p m c)
 revert r e = case IntMap.lookup r (cmap e) of
     Just c | backTracking e -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
            | otherwise      -> Just e { currRef = r, config = c }
@@ -135,7 +139,7 @@ displayDotVertices :: Ref -> Node -> IO ()
 displayDotVertices r n = if n == r then putStrLn ((show n) ++ " [shape=box]") else putStrLn (show n)
     
 
-displayDot :: Show p => Explorer p c  -> IO ()
+displayDot :: Show p => Explorer p m c  -> IO ()
 displayDot g = do
     putStrLn "digraph g {"
     mapM_ (displayDotVertices (currRef g)) (nodes (execEnv g))
@@ -143,7 +147,7 @@ displayDot g = do
     putStrLn "}"
 
 -- TODO: define in terms of displayGr
-display :: Show p => Explorer p c -> String
+display :: Show p => Explorer p m c -> String
 display e = "{\n\"edges\": \"" ++ show (labEdges (execEnv e)) ++ "\",\n"
           ++ "\"vertices\": \"" ++ show (nodes (execEnv e)) ++ "\",\n"
           ++ "\"current\": \"" ++ (show (currRef e)) ++ "\"\n"
@@ -154,5 +158,5 @@ displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
                   ++ "\"vertices\": \"" ++ show (nodes gr) ++ "\",\n"
                   ++ "}"
 
-subExecEnv :: Explorer p c -> Gr () p
+subExecEnv :: Explorer p m c -> Gr () p
 subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)

@@ -5,6 +5,7 @@ import Data.List
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
+import Control.Monad.Identity
 import ExploringInterpreter as E
 
 data Literal = LitBool Bool | LitInt Integer deriving (Eq)
@@ -32,7 +33,8 @@ type StoreM = State Store
 type Output = [String]
 data Config = Config { cfgStore :: Store, cfgOutput :: Output } deriving (Show, Eq)
 
-type WhileExplorer = E.Explorer Command Config
+type WhileExplorer = E.Explorer Command Identity Config
+type WhileExplorerM = E.Explorer Command IO Config
 
 
 evalPlus :: Expr -> Expr -> StoreM Expr
@@ -106,14 +108,15 @@ initialConfig :: Config
 initialConfig = Config {cfgStore = Map.empty, cfgOutput = []}
 
 -- Definitial interpreter for the while language.
-definterp :: Command -> Config -> Config
-definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
+definterp :: Command -> Config -> Identity Config
+definterp c cfg = return $ cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
+-- Simulate doing IO in the definitional interpreter.
 definterpM :: Command -> Config -> IO Config
 definterpM c cfg = do
-    print newout
-    return cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
+    mapM putStrLn newout
+    return cfg {cfgStore = newstore, cfgOutput = []}
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
 
@@ -122,18 +125,35 @@ definterpM c cfg = do
 do_ :: Command -> WhileExplorer -> IO WhileExplorer
 do_ (Seq c1 c2) e = do_ c1 e >>= do_ c2
 do_ p e = do
-    let e' = execute p e
+    let e' = runIdentity $ execute p e 
     putStr $ unlines $ cfgOutput (config e') \\ cfgOutput (config e)
     return e'
 
+do_2 :: Command -> WhileExplorerM -> IO WhileExplorerM
+do_2 (Seq c1 c2) e = do_2 c1 e >>= do_2 c2
+do_2 p e = execute p e 
+
 start :: IO WhileExplorer
 start = return whileGraph
+
+startM :: IO WhileExplorerM
+startM = return whileGraphM
 
 session1 :: IO ()
 session1 = start >>=
   do_ (assign "x" (intToExpr 1)) >>= 
   do_ (assign "y" (Id "x")) >>= 
   do_ (Print (Id "y")) >>=
+  displayDot 
+
+-- When using sharing, this results in 3 configurations and not 4,
+-- since the IO effect is hidden in the monad and not part of the
+-- configurations anymore.
+session2 :: IO ()
+session2 = startM >>=
+  do_2 (assign "x" (intToExpr 1)) >>= 
+  do_2 (assign "y" (Id "x")) >>= 
+  do_2 (Print (Id "y")) >>=
   displayDot 
 
 -- Below are some helpers to create a Command and fully evaluate it.
@@ -176,6 +196,10 @@ wseq = Seq
 
 whileGraph :: WhileExplorer
 whileGraph = mkExplorerGraph definterp initialConfig
+
+whileGraphM :: WhileExplorerM
+whileGraphM = mkExplorerGraph definterpM initialConfig
+
 
 whileTree :: WhileExplorer
 whileTree = mkExplorerTree definterp initialConfig
