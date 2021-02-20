@@ -100,8 +100,10 @@ execute p e = do
     newconf <- defInterp e p (config e)
     return $ updateConf e (p, newconf) 
 
+
+
 executeAll :: (Eq c, Eq p, Monad m) => [p] -> Explorer p m c -> m (Explorer p m c)
-executeAll ps e = foldrM execute e ps
+executeAll = flip (foldlM $ flip execute)
 
 -- Implementation for execute with Monad, can replace execute if
 -- monads are part of the explorer type.
