@@ -18,6 +18,8 @@ import Funcons.Parser
 import Control.Monad (forM_)
 import Data.IORef
 import qualified Data.Map as M
+import Data.Char (isSpace)
+import Text.Read (readMaybe)
 
 import System.Environment
 import System.IO
@@ -30,16 +32,29 @@ data Config = Config {
 
 type Explorer = EI.Explorer Funcons IO Config 
 
+handle_revert :: EI.Ref -> Explorer -> IO Explorer
+handle_revert r exp =
+  case EI.revert r exp of
+    Just e -> return e
+    Nothing -> putStrLn "Invalid reference for revert" >> return exp
+    
+
 repl :: IO ()
 repl = getArgs >>= mk_explorer >>= repl'
  where 
   repl' exp = do
     putStr ("#" ++ show (EI.currRef exp) ++ " > ") >> hFlush stdout
     input <- getLine
-    case fct_parse_either input of 
-        Left err  -> putStrLn err >> repl' exp 
-        Right fct -> EI.execute fct exp >>= repl'  
+    case span (not . isSpace) input of
+      (":display", _)   -> (putStrLn . EI.display) exp >> repl' exp
+      (":revert", mint) | Just ref_id' <- readMaybe (dropWhile isSpace mint)
+                        -> handle_revert ref_id' exp  >>= repl'
+                        | otherwise -> putStrLn "Revert requires an integer argument" >> repl' exp
+      _                 -> case fct_parse_either input of 
+                               Left err  -> putStrLn err >> repl' exp 
+                               Right fct -> EI.execute fct exp >>= repl'  
 
+  
 mk_explorer :: [String] -> IO Explorer 
 mk_explorer args = do
   (opts, unknown_opts) <- run_options args
@@ -47,7 +62,7 @@ mk_explorer args = do
       putStrLn ("unknown option: " ++ arg) 
   opts_ref <- newIORef opts 
   cfg <- mk_initial_config library entities typeenv opts
-  return $ EI.mkExplorerGraph (def_interpreter opts_ref) cfg
+  return $ EI.mkExplorerTree (def_interpreter opts_ref) cfg
  where 
   library = libUnions [ Funcons.Core.Library.funcons, Funcons.EDSL.library, Funcons.Core.Manual.library ]
   entities = Funcons.Core.Library.entities 
