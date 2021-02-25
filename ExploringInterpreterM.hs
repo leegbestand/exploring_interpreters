@@ -19,6 +19,7 @@ module ExploringInterpreterM
     , execEnv
     , Gr
     , getPathFromRootToCurr
+    , getPathsFromTo
     ) where
 
 import Data.Graph.Inductive.Graph 
@@ -182,3 +183,16 @@ getPathFromRootToCurr e = mkGraph nl (filter ((\path -> \(s, t, _) -> (s, t) `el
 
 --subExecEnvL :: Int -> Explorer p m c -> Gr () p
 --subExecEnvL level e =
+
+-- TODO: Handle shared nodes. a -> b -> a is not handled well now if we target (a, b).
+mapOut :: Gr () p -> [Ref] -> Ref -> (Ref, Ref, p) -> Maybe [[(Ref, Ref, p)]]
+mapOut gr visited goal (s, t, l)
+  | goal == t = Just [[(s, t, l)]]
+  | otherwise = case t `elem` visited of
+          True  -> Nothing
+          False -> Just $ map ((:)(s, t, l)) (concat $ catMaybes $ map (mapOut gr (t : visited) goal) (out gr t))
+                                  
+
+
+getPathsFromTo :: Ref -> Ref -> Explorer p m c -> [[(Ref, Ref, p)]]
+getPathsFromTo from to exp = concat $ catMaybes $ map (mapOut (execEnv exp) [from] to) (out (execEnv exp) from)
