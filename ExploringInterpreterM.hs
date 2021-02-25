@@ -18,15 +18,18 @@ module ExploringInterpreterM
     , deref
     , execEnv
     , Gr
+    , getPathFromRootToCurr
     ) where
 
 import Data.Graph.Inductive.Graph 
 import Data.Graph.Inductive.PatriciaTree
 import Data.Graph.Inductive.Query
+import Data.Graph.Inductive.Query.SP
 
 import qualified Data.IntMap as IntMap
 import Data.List
 import Data.Foldable
+import Data.Maybe
 
 type Ref = Int
 
@@ -162,3 +165,20 @@ displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
 
 subExecEnv :: Explorer p m c -> Gr () p
 subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)
+
+
+transformToRealGraph :: Gr () p -> Gr () Int
+transformToRealGraph g = mkGraph (labNodes g) (map (\(s, t) -> (s, t, 1)) (edges g))
+
+transformToPairs :: [Ref] -> [(Ref, Ref)]
+transformToPairs (s:t:xs) = (s, t) : transformToPairs (t:xs)
+transformToPairs _ = []
+
+getPathFromRootToCurr :: Explorer p m c -> Gr () p
+getPathFromRootToCurr e = mkGraph nl (filter ((\path -> \(s, t, _) -> (s, t) `elem` path) (transformToPairs n)) (labEdges $ execEnv e))
+  where
+    n = fromMaybe [] (sp 1 (currRef e) (transformToRealGraph (execEnv e)))
+    nl = filter (\(i, _) -> i `elem` n) (labNodes (execEnv e))
+
+--subExecEnvL :: Int -> Explorer p m c -> Gr () p
+--subExecEnvL level e =

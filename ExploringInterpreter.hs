@@ -17,6 +17,7 @@ module ExploringInterpreter
     , deref
     , execEnv
     , Gr
+    , getPathFromRootToCurr
     ) where
 
 import qualified ExploringInterpreterM as ExplorerM
@@ -79,3 +80,6 @@ displayExecEnv = ExplorerM.displayExecEnv
 
 subExecEnv :: Explorer p c -> Gr () p
 subExecEnv = ExplorerM.subExecEnv
+
+getPathFromRootToCurr :: Explorer p c -> Gr () p
+getPathFromRootToCurr = ExplorerM.getPathFromRootToCurr

@@ -4,7 +4,7 @@ cabal-version:       >=1.10
 -- http://haskell.org/cabal/users-guide/
 
 name:                ExploringInterpreter
-version:             0.1.0.1
+version:             0.1.0.2
 -- synopsis:
 -- description:
 -- bug-reports:
