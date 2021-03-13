@@ -170,9 +170,10 @@ displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
                   ++ "}"
 
 toTree :: Explorer p m c -> Tree (Ref, c)
-toTree exp = Node (initialRef, cmap exp IntMap.! initialRef) (map rec (out graph initialRef))
+toTree exp = mkTree initialRef
   where graph = execEnv exp 
-        rec (_, r, _) = Node (r, cmap exp IntMap.! r) (map rec (out graph r))
+        target (_, r, _) = r
+        mkTree r = Node (r, cmap exp IntMap.! r) (map (mkTree . target) (out graph r))
 
 subExecEnv :: Explorer p m c -> Gr () p
 subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)
