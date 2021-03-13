@@ -8,6 +8,7 @@ module ExploringInterpreterM
     , displayDot
     , display
     , displayExecEnv
+    , toTree
     , subExecEnv
     , mkExplorerStack
     , mkExplorerTree
@@ -27,6 +28,7 @@ import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import Data.Graph.Inductive.Query
 import Data.Graph.Inductive.Query.SP
+import Data.Tree (Tree(..))
 
 import qualified Data.IntMap as IntMap
 import Data.List
@@ -53,12 +55,15 @@ mkExplorer share backtrack definterp conf = Explorer
     { defInterp = definterp
     , config = conf
     , genRef = 1 -- Currently generate reference by increasing a counter.
-    , currRef = 1
+    , currRef = initialRef
     , cmap = IntMap.fromList [(1, conf)]
     , execEnv = mkGraph [(1, ())] []
     , sharing = share 
     , backTracking = backtrack
 }
+
+initialRef :: Int
+initialRef = 1
 
 mkExplorerStack :: (Show a, Eq a, Eq b, Monad m) => (a -> b -> m b) -> b -> Explorer a m b
 mkExplorerStack = mkExplorer False True
@@ -162,6 +167,12 @@ displayExecEnv :: Show p => Gr () p -> String
 displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
                   ++ "\"vertices\": \"" ++ show (nodes gr) ++ "\",\n"
                   ++ "}"
+
+toTree :: Explorer p m c -> Tree (Ref, c)
+toTree exp = mkTree initialRef
+  where graph = execEnv exp 
+        target (_, r, _) = r
+        mkTree r = Node (r, cmap exp IntMap.! r) (map (mkTree . target) (out graph r))
 
 subExecEnv :: Explorer p m c -> Gr () p
 subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)

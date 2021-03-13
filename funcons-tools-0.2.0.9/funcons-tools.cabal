@@ -45,7 +45,7 @@ library
                         , Funcons.RunOptions
   build-depends:       base >=4.8 && <= 5
                       ,text >= 1.2
-                      ,containers >= 0.5 && <= 0.6.0.1
+                      ,containers >= 0.5 && < 0.7
                       ,vector>=0.12
                       ,bv >= 0.5
                       ,multiset >= 0.3
@@ -141,7 +141,7 @@ executable funcons-repl
    other-extensions:    OverloadedStrings
    build-depends:        base >=4.8 && <= 5
                         ,text >= 1.2
-                        ,containers >= 0.5 && <= 0.6.0.1
+                        ,containers >= 0.5 && < 0.7
                         ,vector>=0.12
                         ,bv >= 0.5
                         ,funcons-tools
