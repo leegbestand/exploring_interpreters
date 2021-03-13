@@ -20,9 +20,10 @@ module ExploringInterpreterM
     , Gr
     , getPathFromRootToCurr
     , getPathsFromTo
+    , executionGraph
     ) where
 
-import Data.Graph.Inductive.Graph 
+import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.PatriciaTree
 import Data.Graph.Inductive.Query
 import Data.Graph.Inductive.Query.SP
@@ -47,8 +48,6 @@ data Explorer programs m configs where
         , execEnv :: Gr () programs
         } -> Explorer programs m configs
 
--- TODO: Put types into variables(if possible?).
--- Constructor for a exploring interpreter.
 mkExplorer :: (Show a, Eq a, Eq b, Monad m) => Bool -> Bool -> (a -> b -> m b) -> b -> Explorer a m b
 mkExplorer share backtrack definterp conf = Explorer 
     { defInterp = definterp
@@ -181,18 +180,24 @@ getPathFromRootToCurr e = mkGraph nl (filter ((\path -> \(s, t, _) -> (s, t) `el
     n = fromMaybe [] (sp 1 (currRef e) (transformToRealGraph (execEnv e)))
     nl = filter (\(i, _) -> i `elem` n) (labNodes (execEnv e))
 
---subExecEnvL :: Int -> Explorer p m c -> Gr () p
---subExecEnvL level e =
 
--- TODO: Handle shared nodes. a -> b -> a is not handled well now if we target (a, b).
-mapOut :: Gr () p -> [Ref] -> Ref -> (Ref, Ref, p) -> Maybe [[(Ref, Ref, p)]]
+mapOut :: Gr () p -> [Ref] -> Ref -> (Ref, Ref, p) -> Maybe [[(Ref, p, Ref)]]
 mapOut gr visited goal (s, t, l)
-  | goal == t = Just [[(s, t, l)]]
+  | goal == t = Just $ [[(s, l, t)]] ++ explore
   | otherwise = case t `elem` visited of
           True  -> Nothing
-          False -> Just $ map ((:)(s, t, l)) (concat $ catMaybes $ map (mapOut gr (t : visited) goal) (out gr t))
+          False -> Just $ explore
+  where
+    explore = map ((:)(s, l, t)) (concat $ catMaybes $ map (mapOut gr (t : visited) goal) (out gr t))
                                   
 
-
-getPathsFromTo :: Ref -> Ref -> Explorer p m c -> [[(Ref, Ref, p)]]
+getPathsFromTo :: Ref -> Ref -> Explorer p m c -> [[(Ref, p, Ref)]]
 getPathsFromTo from to exp = concat $ catMaybes $ map (mapOut (execEnv exp) [from] to) (out (execEnv exp) from)
+
+executionGraph :: Explorer p m c -> (Ref, [Ref], [((Ref, c), p, (Ref, c))])
+executionGraph exp =
+  (curr, nodes, edges)
+  where
+    curr = currRef exp
+    nodes = map fst (labNodes (execEnv exp))
+    edges = map (\(s, t, p) -> ((s, fromJust $ deref exp s), p, (t, fromJust $ deref exp t)) ) (labEdges (execEnv exp))
