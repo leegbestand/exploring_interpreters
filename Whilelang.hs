@@ -2,6 +2,7 @@ module Whilelang where
 
 import qualified Data.Map as Map
 import Data.List
+import Data.Graph.Inductive (emap)
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
@@ -36,7 +37,7 @@ type Output = [String]
 data Config = Config { cfgStore :: Store, cfgOutput :: Output } deriving (Show, Eq)
 
 type WhileExplorer = E.Explorer Command Config
-type WhileExplorerM = EM.Explorer Command IO Config
+type WhileExplorerM = EM.Explorer Command IO Config ()
 
 
 evalPlus :: Expr -> Expr -> StoreM Expr
@@ -132,8 +133,8 @@ do_ p e = do
     return e'
 
 do_2 :: Command -> WhileExplorerM -> IO WhileExplorerM
-do_2 (Seq c1 c2) e = do_2 c1 e >>= do_2 c2
-do_2 p e = EM.execute p e 
+do_2 (Seq c1 c2) e = do_2 c1 e >>= do_2 c2 
+do_2 p e = fst <$> EM.execute p e 
 
 start :: IO WhileExplorer
 start = return whileGraph
@@ -200,7 +201,7 @@ whileGraph :: WhileExplorer
 whileGraph = E.mkExplorerGraph definterp initialConfig
 
 whileGraphM :: WhileExplorerM
-whileGraphM = EM.mkExplorerGraph definterpM initialConfig
+whileGraphM = EM.mkExplorerGraph (\p c -> (\c -> (c,())) <$> definterpM p c) initialConfig
 
 
 whileTree :: WhileExplorer
@@ -217,4 +218,4 @@ getRef :: WhileExplorer -> E.Ref
 getRef = E.currRef
 
 getLast :: WhileExplorer -> E.Gr () Command
-getLast = E.subExecEnv
+getLast = emap fst . E.subExecEnv
