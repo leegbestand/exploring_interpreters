@@ -4,11 +4,7 @@ module Language.Explorer.Basic
     , execute
     , executeAll
     , revert
-    , displayDot
-    , display
-    , displayExecEnv
     , ExplorerM.toTree
-    , subExecEnv
     , mkExplorerStack
     , mkExplorerTree
     , mkExplorerGraph

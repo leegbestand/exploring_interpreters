@@ -4,7 +4,7 @@ cabal-version:       >=1.10
 -- http://haskell.org/cabal/users-guide/
 
 name:                ExploringInterpreter
-version:             0.1.0.2
+version:             0.2.0.0
 -- synopsis:
 -- description:
 -- bug-reports:
@@ -17,9 +17,16 @@ category:            Language
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
+source-repository head
+    type:         git
+    location:     https://github.com/leegbestand/exploring_interpreters
+
 library
-  exposed-modules:     ExploringInterpreter ExploringInterpreterM ExploringInterpreterOutput
-  -- other-modules:
+  exposed-modules:
+      Language.Explorer.Monadic,
+      Language.Explorer.Pure
+  other-modules:
+      Language.Explorer.Basic
   -- other-extensions:
   build-depends:       base >=4.9 && <5, containers >=0.5 && <0.7, transformers >=0.5, fgl >=5.7, mtl >=2.2.1
   -- hs-source-dirs:

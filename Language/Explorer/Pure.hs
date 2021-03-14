@@ -4,9 +4,6 @@ module Language.Explorer.Pure
     , execute
     , executeAll
     , revert
-    , displayDot
-    , display
-    , displayExecEnv
     , ExplorerM.toTree
     , subExecEnv
     , mkExplorerStack

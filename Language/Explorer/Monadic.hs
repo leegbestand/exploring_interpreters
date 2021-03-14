@@ -5,9 +5,6 @@ module Language.Explorer.Monadic
     , execute
     , executeAll
     , revert
-    , displayDot
-    , display
-    , displayExecEnv
     , toTree
     , subExecEnv
     , mkExplorerStack
