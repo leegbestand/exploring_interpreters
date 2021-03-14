@@ -1,11 +1,10 @@
-
 module Language.Explorer.Pure
     ( Explorer
     , execute
     , executeAll
     , revert
     , ExplorerM.toTree
-    , incomingEdges 
+    , incomingEdges
     , mkExplorerStack
     , mkExplorerTree
     , mkExplorerGraph
@@ -14,9 +13,11 @@ module Language.Explorer.Pure
     , currRef
     , Ref
     , deref
-    , execEnv
-    , Gr
-    , getPathFromRootToCurr
+    , pathFromRootToCurr
+    , pathsFromRootToCurr
+    , pathsFromTo
+    , pathFromTo
+    , executionGraph
     ) where
 
 import qualified Language.Explorer.Monadic as ExplorerM
@@ -29,14 +30,10 @@ import Data.Foldable
 -- We shadow instead of exporting directly to make the user interaction
 -- the same.
 type Ref = ExplorerM.Ref
-type Gr = ExplorerM.Gr
 type Explorer a b o = ExplorerM.Explorer a Identity b o
 
 currRef :: Explorer a b o -> Ref
 currRef = ExplorerM.currRef
-
-execEnv :: Explorer a b o -> Gr Ref (a, o)
-execEnv = ExplorerM.execEnv
 
 config :: Explorer a b o -> b
 config = ExplorerM.config
@@ -44,13 +41,10 @@ config = ExplorerM.config
 deref :: Explorer p c o -> Ref -> Maybe c
 deref = ExplorerM.deref
 
--- This should be able with func composition.
 wrap :: (Monad m, Monoid o) => (a -> b -> (b,o)) -> a -> b -> m (b, o)
 wrap def p e = return $ def p e
 
--- TODO: Put types into variables(if possible?).
--- Constructor for a exploring interpreter.
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS:: (Show a, Eq a, Eq b, Monoid o) => (a -> b -> (b,o)) -> b -> Explorer a b o 
+mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS:: (Show a, Eq a, Eq b, Monoid o) => (a -> b -> (b,o)) -> b -> Explorer a b o
 mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
 mkExplorerTree definterp conf = ExplorerM.mkExplorerTree (wrap definterp) conf
 mkExplorerGraph definterp conf = ExplorerM.mkExplorerGraph (wrap definterp) conf
@@ -68,5 +62,17 @@ revert = ExplorerM.revert
 incomingEdges :: Ref -> Explorer p c o -> [((Ref, c), (p, o), (Ref, c))]
 incomingEdges = ExplorerM.incomingEdges
 
-getPathFromRootToCurr :: Explorer p c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-getPathFromRootToCurr = ExplorerM.getPathFromRootToCurr
+pathFromRootToCurr :: Explorer p c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
+pathFromRootToCurr = ExplorerM.pathFromRootToCurr
+
+pathsFromRootToCurr :: Explorer p c o -> [[((Ref, c), (p, o), (Ref, c))]]
+pathsFromRootToCurr = ExplorerM.pathsFromRootToCurr
+
+pathsFromTo :: Ref -> Ref -> Explorer p c o -> [[((Ref, c), (p, o), (Ref, c))]]
+pathsFromTo = ExplorerM.pathsFromTo
+
+pathFromTo :: Ref -> Ref -> Explorer p c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
+pathFromTo = ExplorerM.pathFromTo
+
+executionGraph :: Explorer p c o -> (Ref, [Ref], [((Ref, c), (p, o), (Ref, c))])
+executionGraph = ExplorerM.executionGraph

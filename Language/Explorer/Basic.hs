@@ -1,5 +1,4 @@
-
-module Language.Explorer.Basic 
+module Language.Explorer.Basic
     ( Explorer
     , execute
     , executeAll
@@ -13,9 +12,11 @@ module Language.Explorer.Basic
     , currRef
     , Ref
     , deref
-    , execEnv
-    , Gr
-    , getPathFromRootToCurr
+    , pathFromRootToCurr
+    , pathsFromRootToCurr
+    , pathsFromTo
+    , pathFromTo
+    , executionGraph
     ) where
 
 import qualified Language.Explorer.Monadic as ExplorerM
@@ -31,14 +32,10 @@ import Data.Graph.Inductive.Graph (emap)
 -- We shadow instead of exporting directly to make the user interaction
 -- the same.
 type Ref = ExplorerM.Ref
-type Gr = ExplorerM.Gr
 type Explorer a b = ExplorerM.Explorer a Identity b ()
 
 currRef :: Explorer a b -> Ref
 currRef = ExplorerM.currRef
-
-execEnv :: Explorer a b -> Gr Ref a
-execEnv = emap fst . ExplorerM.execEnv
 
 config :: Explorer a b -> b
 config = ExplorerM.config
@@ -72,8 +69,25 @@ executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
 revert :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
 revert = ExplorerM.revert
 
-incomingEdges :: Ref -> Explorer p c -> [((Ref, c), p, (Ref, c))]
-incomingEdges r e = map (\(s, (p, _), t) -> (s, p, t)) $ ExplorerM.incomingEdges r e
+removeOutput :: ((Ref, c), (p, o), (Ref, c)) -> ((Ref, c), p, (Ref, c))
+removeOutput (s, (p, _), t) = (s, p, t)
 
-getPathFromRootToCurr :: Explorer p c -> Maybe [((Ref, c), p, (Ref, c))]
-getPathFromRootToCurr e = map (\(s, (p, _), t) -> (s, p, t)) <$> ExplorerM.getPathFromRootToCurr e
+incomingEdges :: Ref -> Explorer p c -> [((Ref, c), p, (Ref, c))]
+incomingEdges r e = map removeOutput $ ExplorerM.incomingEdges r e
+
+pathFromRootToCurr :: Explorer p c -> Maybe [((Ref, c), p, (Ref, c))]
+pathFromRootToCurr e = map removeOutput <$> ExplorerM.pathFromRootToCurr e
+
+pathsFromRootToCurr :: Explorer p c -> [[((Ref, c), p, (Ref, c))]]
+pathsFromRootToCurr e = map (map removeOutput) $ ExplorerM.pathsFromRootToCurr e
+
+pathsFromTo :: Ref -> Ref -> Explorer p c -> [[((Ref, c), p, (Ref, c))]]
+pathsFromTo s t e = map (map removeOutput) $ ExplorerM.pathsFromTo s t e
+
+pathFromTo :: Ref -> Ref -> Explorer p c -> Maybe [((Ref, c), p, (Ref, c))]
+pathFromTo s t e = map removeOutput <$> ExplorerM.pathFromTo s t e
+
+executionGraph :: Explorer p c -> (Ref, [Ref], [((Ref, c), p, (Ref, c))])
+executionGraph e = (curr, nodes, map removeOutput graph)
+  where
+    (curr, nodes, graph) = ExplorerM.executionGraph e

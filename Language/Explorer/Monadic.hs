@@ -15,10 +15,11 @@ module Language.Explorer.Monadic
     , currRef
     , Ref
     , deref
-    , execEnv
-    , Gr
-    , getPathFromRootToCurr
-    , getPathsFromTo
+    , pathFromRootToCurr
+    , pathsFromRootToCurr
+    , pathsFromTo
+    , pathFromTo
+    , executionGraph
     ) where
 
 import Data.Graph.Inductive.Graph
@@ -35,7 +36,7 @@ import Data.Maybe
 type Ref = Int
 
 data Explorer programs m configs output where
-    Explorer :: (Show programs, Eq programs, Eq configs, Monad m, Monoid output) => 
+    Explorer :: (Show programs, Eq programs, Eq configs, Monad m, Monoid output) =>
         { sharing :: Bool
         , backTracking :: Bool
         , defInterp :: programs -> configs -> m (configs, output)
@@ -43,20 +44,19 @@ data Explorer programs m configs output where
         , currRef :: Ref
         , genRef :: Ref
         , cmap :: IntMap.IntMap configs
-        -- TODO: Make Gr Ref programs
         , execEnv :: Gr Ref (programs, output)
         } -> Explorer programs m configs output
 
-mkExplorer :: (Show a, Eq a, Eq b, Monad m, Monoid o) => 
+mkExplorer :: (Show a, Eq a, Eq b, Monad m, Monoid o) =>
   Bool -> Bool -> (a -> b -> m (b,o)) -> b -> Explorer a m b o
-mkExplorer share backtrack definterp conf = Explorer 
+mkExplorer share backtrack definterp conf = Explorer
     { defInterp = definterp
     , config = conf
     , genRef = 1 -- Currently generate references by increasing a counter.
     , currRef = initialRef
     , cmap = IntMap.fromList [(initialRef, conf)]
     , execEnv = mkGraph [(initialRef, initialRef)] []
-    , sharing = share 
+    , sharing = share
     , backTracking = backtrack
 }
 
@@ -66,7 +66,7 @@ initialRef = 1
 mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b, Monad m, Monoid o) => (a -> b -> m (b,o)) -> b -> Explorer a m b o
 mkExplorerStack = mkExplorer False True
 mkExplorerTree  = mkExplorer False False
-mkExplorerGraph = mkExplorer True False 
+mkExplorerGraph = mkExplorer True False
 mkExplorerGSS   = mkExplorer True True
 
 deref :: Explorer p m c o -> Ref -> Maybe c
@@ -81,11 +81,11 @@ addNewPath e p o c = e { config = c, currRef = newref, genRef = newref, cmap = I
      where newref = genRef e + 1
 
 updateConf :: (Eq c, Eq p, Eq o) => Explorer p m c o -> (p, c, o) -> Explorer p m c o
-updateConf e (p, newconf, output) = 
+updateConf e (p, newconf, output) =
     if sharing e
         then case findRef e newconf of
-            Just (r, c) -> 
-                if hasLEdge (execEnv e) (currRef e, r, (p,output)) 
+            Just (r, c) ->
+                if hasLEdge (execEnv e) (currRef e, r, (p,output))
                     then e  { config = newconf, currRef = r }
                     else e  { config = newconf, currRef = r
                             , execEnv = insEdge (currRef e, r, (p,output)) (execEnv e) }
@@ -95,7 +95,7 @@ updateConf e (p, newconf, output) =
 execute :: (Eq c, Eq p, Eq o, Monad m, Monoid o) =>  p -> Explorer p m c o -> m (Explorer p m c o, o)
 execute p e = do
     (newconf,out) <- defInterp e p (config e)
-    return $ (updateConf e (p, newconf, out), out) 
+    return $ (updateConf e (p, newconf, out), out)
 
 
 
@@ -104,15 +104,6 @@ executeAll ps exp = foldlM executeCollect (exp, mempty) ps
   where executeCollect (exp, out) p = do (res, out') <- execute p exp
                                          return (res, out `mappend` out')
 
--- Implementation for execute with Monad, can replace execute if
--- monads are part of the explorer type.
-{-- executeM :: (Eq c, Eq p) => p -> Explorer p m c -> IO (Explorer p m c)
-executeM p e  = do
-    c' <- defInterpM e p (config e)
-    return $ updateConf e (p, c')
---}
-
-    
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
@@ -128,7 +119,7 @@ revert r e = case IntMap.lookup r (cmap e) of
 
 toTree :: Explorer p m c o -> Tree (Ref, c)
 toTree exp = mkTree initialRef
-  where graph = execEnv exp 
+  where graph = execEnv exp
         target (_, r, _) = r
         mkTree r = Node (r, cmap exp IntMap.! r) (map (mkTree . target) (out graph r))
 
@@ -137,7 +128,7 @@ incomingEdges :: Ref -> Explorer p m c o -> [((Ref, c), (p, o), (Ref, c))]
 incomingEdges ref e = foldr (\(s, t, l) acc ->  [((s, unpack s), l, (t, unpack t))] ++ acc) [] (filter (\(_, t, _) -> t == ref) (labEdges (execEnv e)))
   where
     unpack ref = fromJust $ deref e ref
-              
+
 
 transformToRealGraph :: Gr Ref p -> Gr Ref Int
 transformToRealGraph g = mkGraph (labNodes g) (map (\(s, t) -> (s, t, 1)) (edges g))
@@ -146,26 +137,30 @@ transformToPairs :: [Ref] -> [(Ref, Ref)]
 transformToPairs (s:t:xs) = (s, t) : transformToPairs (t:xs)
 transformToPairs _ = []
 
-getPathFromRootToCurr :: Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-getPathFromRootToCurr e = getPathFromTo initialRef (currRef e) e
-  
+pathFromRootToCurr :: Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
+pathFromRootToCurr e = pathFromTo initialRef (currRef e) e
+
+pathsFromRootToCurr :: Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
+pathsFromRootToCurr e = pathsFromTo initialRef (currRef e) e
+
+
 mapOut :: Explorer p m c o -> Gr Ref (p, o) -> [Ref] -> Ref -> (Ref, Ref, (p,o)) -> Maybe [[((Ref, c), (p, o), (Ref, c))]]
-mapOut exp gr visited goal (s, t, (l, o))
-  | goal == t = Just $ [[((s, unpack s), (l, o), (t, unpack t))]] ++ explore
-  | otherwise = case t `elem` visited of
-          True  -> Nothing
-          False -> Just explore
+mapOut exp gr visited goal (s, t, (l, o)) =
+  case t `elem` visited of
+    True | t == goal -> Just [[((s, unpack s), (l, o), (t, unpack t))]]
+         | otherwise -> Nothing
+    False            -> Just explore
   where
     explore = map ((:)((s, unpack s), (l, o), (t, unpack t))) (concat $ catMaybes $ map (mapOut exp gr (t : visited) goal) (out gr t))
     unpack ref = fromJust $ deref exp ref
 
 
-getPathsFromTo :: Ref -> Ref -> Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
-getPathsFromTo from to exp = concat $ catMaybes $ map (mapOut exp (execEnv exp) [from] to) (out (execEnv exp) from)
+pathsFromTo :: Ref -> Ref -> Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
+pathsFromTo from to exp = concat $ catMaybes $ map (mapOut exp (execEnv exp) [from] to) (out (execEnv exp) from)
 
-getPathFromTo :: Ref -> Ref -> Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-getPathFromTo s t e =
-  case getPathsFromTo s t e of
+pathFromTo :: Ref -> Ref -> Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
+pathFromTo s t e =
+  case pathsFromTo s t e of
     [] -> Nothing
     (x:_) -> Just x
 
@@ -178,4 +173,3 @@ executionGraph exp =
     curr = currRef exp
     nodes = map fst (labNodes (execEnv exp))
     edges = map (\(s, t, p) -> ((s, fromJust $ deref exp s), p, (t, fromJust $ deref exp t)) ) (labEdges (execEnv exp))
-
