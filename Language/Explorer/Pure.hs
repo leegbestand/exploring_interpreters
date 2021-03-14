@@ -68,15 +68,6 @@ executeAll p e = runIdentity $ ExplorerM.executeAll p e
 revert :: ExplorerM.Ref -> Explorer p c o -> Maybe (Explorer p c o)
 revert = ExplorerM.revert
 
-display :: (Show p, Show o) => Explorer p c o -> String
-display = ExplorerM.display
-
-displayDot :: (Show p, Show o) => Explorer p c o  -> IO ()
-displayDot = ExplorerM.displayDot
-
-displayExecEnv :: (Show p, Show o) => Gr Ref (p,o) -> String
-displayExecEnv = ExplorerM.displayExecEnv
-
 subExecEnv :: Explorer p c o -> Gr Ref (p,o)
 subExecEnv = ExplorerM.subExecEnv
 

@@ -129,39 +129,6 @@ revert r e = case IntMap.lookup r (cmap e) of
           execEnv'   = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
           cmap'      = deleteMap nodesToDel (cmap e)
 
-
-displayDotEdge :: Show v => Show e => (v, v, e) -> IO ()
-displayDotEdge (s, t, e) = do
-    putStr (show s)
-    putStr " -> "
-    putStr (show t)
-    putStr "[label="
-    putStr $ show (show e)
-    putStrLn "]"
-
-displayDotVertices :: Ref -> Node -> IO ()
-displayDotVertices r n = if n == r then putStrLn ((show n) ++ " [shape=box]") else putStrLn (show n)
-    
-
-displayDot :: (Show p, Show o) => Explorer p m c o  -> IO ()
-displayDot g = do
-    putStrLn "digraph g {"
-    mapM_ (displayDotVertices (currRef g)) (nodes (execEnv g))
-    mapM_ displayDotEdge (labEdges (execEnv g))
-    putStrLn "}"
-
--- TODO: define in terms of displayGr
-display :: (Show p, Show o) => Explorer p m c o -> String
-display e = "{\n\"edges\": \"" ++ show (labEdges (execEnv e)) ++ "\",\n"
-          ++ "\"vertices\": \"" ++ show (nodes (execEnv e)) ++ "\",\n"
-          ++ "\"current\": \"" ++ (show (currRef e)) ++ "\"\n"
-          ++ "}"
-
-displayExecEnv :: Show p => Gr Ref p -> String
-displayExecEnv gr = "{\n\"edges\": \"" ++ show (labEdges gr) ++ "\",\n"
-                  ++ "\"vertices\": \"" ++ show (nodes gr) ++ "\",\n"
-                  ++ "}"
-
 toTree :: Explorer p m c o -> Tree (Ref, c)
 toTree exp = mkTree initialRef
   where graph = execEnv exp 

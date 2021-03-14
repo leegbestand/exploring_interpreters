@@ -53,7 +53,6 @@ deref = ExplorerM.deref
 wrap :: Monad m => (a -> b -> b) -> a -> b -> m (b, ())
 wrap def p e = return $ (def p e, ())
 
--- TODO: Put types into variables(if possible?).
 -- Constructor for a exploring interpreter.
 mkExplorerStack:: (Show a, Eq a, Eq b) => (a -> b -> b) -> b -> Explorer a b
 mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
@@ -75,18 +74,6 @@ executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
 
 revert :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
 revert = ExplorerM.revert
-
-display :: Show p => Explorer p c -> String
-display = ExplorerM.display
-
-displayDot :: Show p => Explorer p c  -> IO ()
-displayDot = ExplorerM.displayDot
-
-displayExecEnv :: Show p => Gr Ref (p,()) -> String
-displayExecEnv = ExplorerM.displayExecEnv 
-
-subExecEnv :: Explorer p c -> Gr Ref (p,())
-subExecEnv = ExplorerM.subExecEnv
 
 getPathFromRootToCurr :: Explorer p c -> Gr Ref (p, ())
 getPathFromRootToCurr = ExplorerM.getPathFromRootToCurr
