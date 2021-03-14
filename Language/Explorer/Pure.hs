@@ -5,7 +5,7 @@ module Language.Explorer.Pure
     , executeAll
     , revert
     , ExplorerM.toTree
-    , subExecEnv
+    , incomingEdges 
     , mkExplorerStack
     , mkExplorerTree
     , mkExplorerGraph
@@ -65,8 +65,8 @@ executeAll p e = runIdentity $ ExplorerM.executeAll p e
 revert :: ExplorerM.Ref -> Explorer p c o -> Maybe (Explorer p c o)
 revert = ExplorerM.revert
 
-subExecEnv :: Explorer p c o -> Gr Ref (p,o)
-subExecEnv = ExplorerM.subExecEnv
+incomingEdges :: Ref -> Explorer p c o -> [((Ref, c), (p, o), (Ref, c))]
+incomingEdges = ExplorerM.incomingEdges
 
-getPathFromRootToCurr :: Explorer p c o -> Gr Ref (p, o)
+getPathFromRootToCurr :: Explorer p c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
 getPathFromRootToCurr = ExplorerM.getPathFromRootToCurr

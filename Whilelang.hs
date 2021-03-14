@@ -7,8 +7,9 @@ import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
 import Control.Monad.Identity
-import qualified ExploringInterpreter as E
-import qualified ExploringInterpreterM as EM
+import qualified Language.Explorer.Basic as E
+import qualified Language.Explorer.Pure as EP
+import qualified Language.Explorer.Monadic as EM
 
 
 data Literal = LitBool Bool | LitInt Integer deriving (Eq)
@@ -147,7 +148,8 @@ session1 = start >>=
   do_ (assign "x" (intToExpr 1)) >>= 
   do_ (assign "y" (Id "x")) >>= 
   do_ (Print (Id "y")) >>=
-  E.displayDot 
+  \_ -> putStrLn "Done"
+
 
 -- When using sharing, this results in 3 configurations and not 4,
 -- since the IO effect is hidden in the monad and not part of the
@@ -157,7 +159,8 @@ session2 = startM >>=
   do_2 (assign "x" (intToExpr 1)) >>= 
   do_2 (assign "y" (Id "x")) >>= 
   do_2 (Print (Id "y")) >>=
-  EM.displayDot 
+  \_ -> putStrLn "Done"
+
 
 -- Below are some helpers to create a Command and fully evaluate it.
 -- Example:
@@ -216,6 +219,3 @@ zero = intToExpr 0
 
 getRef :: WhileExplorer -> E.Ref
 getRef = E.currRef
-
-getLast :: WhileExplorer -> E.Gr () Command
-getLast = emap fst . E.subExecEnv

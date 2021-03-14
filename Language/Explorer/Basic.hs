@@ -23,6 +23,7 @@ import Control.Monad.Identity
 
 import qualified Data.IntMap as IntMap
 import Data.List
+import Data.Functor
 import Data.Foldable
 import Data.Monoid ()
 import Data.Graph.Inductive.Graph (emap)
@@ -71,5 +72,8 @@ executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
 revert :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
 revert = ExplorerM.revert
 
-getPathFromRootToCurr :: Explorer p c -> Gr Ref (p, ())
-getPathFromRootToCurr = ExplorerM.getPathFromRootToCurr
+incomingEdges :: Ref -> Explorer p c -> [((Ref, c), p, (Ref, c))]
+incomingEdges r e = map (\(s, (p, _), t) -> (s, p, t)) $ ExplorerM.incomingEdges r e
+
+getPathFromRootToCurr :: Explorer p c -> Maybe [((Ref, c), p, (Ref, c))]
+getPathFromRootToCurr e = map (\(s, (p, _), t) -> (s, p, t)) <$> ExplorerM.getPathFromRootToCurr e

@@ -6,7 +6,7 @@ module Language.Explorer.Monadic
     , executeAll
     , revert
     , toTree
-    , subExecEnv
+    , incomingEdges
     , mkExplorerStack
     , mkExplorerTree
     , mkExplorerGraph
@@ -132,8 +132,12 @@ toTree exp = mkTree initialRef
         target (_, r, _) = r
         mkTree r = Node (r, cmap exp IntMap.! r) (map (mkTree . target) (out graph r))
 
-subExecEnv :: Explorer p m c o -> Gr Ref (p,o)
-subExecEnv e = subgraph (foldr (\(s, t) l ->  s : t : l) [] (filter (\(_, t) -> t == (currRef e)) (edges (execEnv e)))) (execEnv e)
+
+incomingEdges :: Ref -> Explorer p m c o -> [((Ref, c), (p, o), (Ref, c))]
+incomingEdges ref e = foldr (\(s, t, l) acc ->  [((s, unpack s), l, (t, unpack t))] ++ acc) [] (filter (\(_, t, _) -> t == ref) (labEdges (execEnv e)))
+  where
+    unpack ref = fromJust $ deref e ref
+              
 
 transformToRealGraph :: Gr Ref p -> Gr Ref Int
 transformToRealGraph g = mkGraph (labNodes g) (map (\(s, t) -> (s, t, 1)) (edges g))
@@ -142,25 +146,30 @@ transformToPairs :: [Ref] -> [(Ref, Ref)]
 transformToPairs (s:t:xs) = (s, t) : transformToPairs (t:xs)
 transformToPairs _ = []
 
-getPathFromRootToCurr :: Explorer p m c o -> Gr Ref (p, o)
-getPathFromRootToCurr e = mkGraph nl (filter ((\path -> \(s, t, _) -> (s, t) `elem` path) (transformToPairs n)) (labEdges $ execEnv e))
-  where
-    n = fromMaybe [] (sp 1 (currRef e) (transformToRealGraph (execEnv e)))
-    nl = filter (\(i, _) -> i `elem` n) (labNodes (execEnv e))
-
-mapOut :: Gr Ref (p,o) -> [Ref] -> Ref -> (Ref, Ref, (p,o)) -> Maybe [[(Ref, Ref, p, o)]]
-mapOut gr visited goal (s, t, (l,o))
-  | goal == t = Just $ [[(s, t, l, o)]] ++ explore
+getPathFromRootToCurr :: Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
+getPathFromRootToCurr e = getPathFromTo initialRef (currRef e) e
+  
+mapOut :: Explorer p m c o -> Gr Ref (p, o) -> [Ref] -> Ref -> (Ref, Ref, (p,o)) -> Maybe [[((Ref, c), (p, o), (Ref, c))]]
+mapOut exp gr visited goal (s, t, (l, o))
+  | goal == t = Just $ [[((s, unpack s), (l, o), (t, unpack t))]] ++ explore
   | otherwise = case t `elem` visited of
           True  -> Nothing
           False -> Just explore
   where
-    explore = map ((:)(s, t, l, o)) (concat $ catMaybes $ map (mapOut gr (t : visited) goal) (out gr t))
-                                  
+    explore = map ((:)((s, unpack s), (l, o), (t, unpack t))) (concat $ catMaybes $ map (mapOut exp gr (t : visited) goal) (out gr t))
+    unpack ref = fromJust $ deref exp ref
 
 
-getPathsFromTo :: Ref -> Ref -> Explorer p m c o -> [[(Ref, Ref, p, o)]]
-getPathsFromTo from to exp = concat $ catMaybes $ map (mapOut (execEnv exp) [from] to) (out (execEnv exp) from)
+getPathsFromTo :: Ref -> Ref -> Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
+getPathsFromTo from to exp = concat $ catMaybes $ map (mapOut exp (execEnv exp) [from] to) (out (execEnv exp) from)
+
+getPathFromTo :: Ref -> Ref -> Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
+getPathFromTo s t e =
+  case getPathsFromTo s t e of
+    [] -> Nothing
+    (x:_) -> Just x
+
+
 
 executionGraph :: Explorer p m c o -> (Ref, [Ref], [((Ref, c), (p, o), (Ref, c))])
 executionGraph exp =
