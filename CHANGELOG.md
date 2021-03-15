@@ -1,5 +1,4 @@
-# Revision history for ExploringInterpreter
+# Revision history for exploring-interpreters 
 
-## 0.1.0.0 -- YYYY-mm-dd
-
-* First version. Released on an unsuspecting world.
+## 0.2.0.0 -- 2021-03-15
+* First official version. 

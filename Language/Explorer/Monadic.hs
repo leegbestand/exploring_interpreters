@@ -5,6 +5,7 @@ module Language.Explorer.Monadic
     , execute
     , executeAll
     , revert
+    , dynamicRevert 
     , toTree
     , incomingEdges
     , mkExplorerStack
@@ -12,13 +13,14 @@ module Language.Explorer.Monadic
     , mkExplorerGraph
     , mkExplorerGSS
     , config
+    , execEnv
     , currRef
     , Ref
     , deref
-    , pathFromRootToCurr
-    , pathsFromRootToCurr
-    , pathsFromTo
-    , pathFromTo
+    , getTrace
+    , getTraces
+    , getPathsFromTo
+    , getPathFromTo
     , executionGraph
     ) where
 
@@ -107,16 +109,22 @@ executeAll ps exp = foldlM executeCollect (exp, mempty) ps
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
-revert :: Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
-revert r e = case IntMap.lookup r (cmap e) of
-    Just c | backTracking e -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
-           | otherwise      -> Just e { currRef = r, config = c }
-    Nothing                 -> Nothing
+dynamicRevert :: Bool -> Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
+dynamicRevert backtrack r e =
+  case IntMap.lookup r (cmap e) of
+    Just c | backtrack -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
+           | otherwise -> Just e { currRef = r, config = c }
+    Nothing            -> Nothing
     where nodesToDel = reachable r (execEnv e) \\ [r]
           edgesToDel = filter (\(s, t) -> s `elem` nodesToDel || t `elem` nodesToDel) (edges (execEnv e))
           execEnv'   = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
           cmap'      = deleteMap nodesToDel (cmap e)
 
+
+revert :: Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
+revert r e = dynamicRevert (backTracking e) r e
+
+  
 toTree :: Explorer p m c o -> Tree (Ref, c)
 toTree exp = mkTree initialRef
   where graph = execEnv exp
@@ -137,33 +145,32 @@ transformToPairs :: [Ref] -> [(Ref, Ref)]
 transformToPairs (s:t:xs) = (s, t) : transformToPairs (t:xs)
 transformToPairs _ = []
 
-pathFromRootToCurr :: Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-pathFromRootToCurr e = pathFromTo initialRef (currRef e) e
+getTrace :: Explorer p m c o -> [((Ref, c), (p, o), (Ref, c))]
+getTrace e = getPathFromTo e initialRef (currRef e)
 
-pathsFromRootToCurr :: Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
-pathsFromRootToCurr e = pathsFromTo initialRef (currRef e) e
+getTraces :: Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
+getTraces e = getPathsFromTo e initialRef (currRef e)
 
 
 mapOut :: Explorer p m c o -> Gr Ref (p, o) -> [Ref] -> Ref -> (Ref, Ref, (p,o)) -> Maybe [[((Ref, c), (p, o), (Ref, c))]]
-mapOut exp gr visited goal (s, t, (l, o)) =
-  case t `elem` visited of
-    True | t == goal -> Just [[((s, unpack s), (l, o), (t, unpack t))]]
-         | otherwise -> Nothing
-    False            -> Just explore
+mapOut exp gr visited goal (s, t, (l, o))
+  | goal == t = Just $ [[((s, unpack s), (l, o), (t, unpack t))]] ++ explore
+  | otherwise = case t `elem` visited of
+                  True -> Nothing
+                  False -> Just explore
   where
     explore = map ((:)((s, unpack s), (l, o), (t, unpack t))) (concat $ catMaybes $ map (mapOut exp gr (t : visited) goal) (out gr t))
     unpack ref = fromJust $ deref exp ref
 
 
-pathsFromTo :: Ref -> Ref -> Explorer p m c o -> [[((Ref, c), (p, o), (Ref, c))]]
-pathsFromTo from to exp = concat $ catMaybes $ map (mapOut exp (execEnv exp) [from] to) (out (execEnv exp) from)
+getPathsFromTo :: Explorer p m c o -> Ref -> Ref -> [[((Ref, c), (p, o), (Ref, c))]]
+getPathsFromTo exp from to = concat $ catMaybes $ map (mapOut exp (execEnv exp) [from] to) (out (execEnv exp) from)
 
-pathFromTo :: Ref -> Ref -> Explorer p m c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-pathFromTo s t e =
-  case pathsFromTo s t e of
-    [] -> Nothing
-    (x:_) -> Just x
-
+getPathFromTo :: Explorer p m c o -> Ref -> Ref -> [((Ref, c), (p, o), (Ref, c))]
+getPathFromTo exp from to =
+  case getPathsFromTo exp from to of
+    [] -> []
+    (x:_) -> x
 
 
 executionGraph :: Explorer p m c o -> (Ref, [Ref], [((Ref, c), (p, o), (Ref, c))])

@@ -39,7 +39,7 @@ data Config = Config { cfgStore :: Store, cfgOutput :: Output } deriving (Show, 
 
 type WhileExplorer = E.Explorer Command Config
 type WhileExplorerM = EM.Explorer Command IO Config ()
-
+type WhileExplorerO = EP.Explorer Command Config [String]
 
 evalPlus :: Expr -> Expr -> StoreM Expr
 evalPlus (LitExpr (LitInt l1)) (LitExpr (LitInt l2)) = return $ LitExpr $ LitInt (l1 + l2)
@@ -116,6 +116,12 @@ definterp :: Command -> Config -> Config
 definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
+
+definterpO :: Command -> Config -> (Config, [String])
+definterpO c cfg = (cfg {cfgStore = newstore}, newout)
+    where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
+
+
 -- Simulate doing IO in the definitional interpreter.
 definterpM :: Command -> Config -> IO Config
 definterpM c cfg = do
@@ -135,7 +141,12 @@ do_ p e = do
 
 do_2 :: Command -> WhileExplorerM -> IO WhileExplorerM
 do_2 (Seq c1 c2) e = do_2 c1 e >>= do_2 c2 
-do_2 p e = fst <$> EM.execute p e 
+do_2 p e = fst <$> EM.execute p e
+
+do_3 :: Command -> (WhileExplorerO, [String]) -> (WhileExplorerO, [String])
+do_3 (Seq c1 c2) e = do_3 c2 $ do_3 c1 e 
+do_3 p (e, o) = (e', o ++ o')
+  where (e', o') = EP.execute p e
 
 start :: IO WhileExplorer
 start = return whileGraph
@@ -143,24 +154,29 @@ start = return whileGraph
 startM :: IO WhileExplorerM
 startM = return whileGraphM
 
-session1 :: IO ()
+startO :: WhileExplorerO
+startO = whileGraphO
+
+session1 :: IO WhileExplorer
 session1 = start >>=
   do_ (assign "x" (intToExpr 1)) >>= 
   do_ (assign "y" (Id "x")) >>= 
-  do_ (Print (Id "y")) >>=
-  \_ -> putStrLn "Done"
+  do_ (Print (Id "y"))
 
 
 -- When using sharing, this results in 3 configurations and not 4,
 -- since the IO effect is hidden in the monad and not part of the
 -- configurations anymore.
-session2 :: IO ()
+session2 :: IO WhileExplorerM
 session2 = startM >>=
   do_2 (assign "x" (intToExpr 1)) >>= 
   do_2 (assign "y" (Id "x")) >>= 
-  do_2 (Print (Id "y")) >>=
-  \_ -> putStrLn "Done"
+  do_2 (Print (Id "y"))
 
+
+session3 :: (WhileExplorerO, [String])
+session3 =
+  do_3 (Print (Id "y")) $ do_3 (assign "y" (Id "x")) $ do_3 (assign "x" (intToExpr 1)) (startO, [])
 
 -- Below are some helpers to create a Command and fully evaluate it.
 -- Example:
@@ -198,14 +214,14 @@ assign = Assign
 wseq :: Command -> Command -> Command
 wseq = Seq
 
-
-
 whileGraph :: WhileExplorer
 whileGraph = E.mkExplorerGraph definterp initialConfig
 
 whileGraphM :: WhileExplorerM
 whileGraphM = EM.mkExplorerGraph (\p c -> (\c -> (c,())) <$> definterpM p c) initialConfig
 
+whileGraphO :: WhileExplorerO
+whileGraphO = EP.mkExplorerGraph definterpO initialConfig
 
 whileTree :: WhileExplorer
 whileTree = E.mkExplorerTree definterp initialConfig

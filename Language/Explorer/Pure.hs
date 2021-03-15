@@ -3,6 +3,7 @@ module Language.Explorer.Pure
     , execute
     , executeAll
     , revert
+    , dynamicRevert 
     , ExplorerM.toTree
     , incomingEdges
     , mkExplorerStack
@@ -13,10 +14,10 @@ module Language.Explorer.Pure
     , currRef
     , Ref
     , deref
-    , pathFromRootToCurr
-    , pathsFromRootToCurr
-    , pathsFromTo
-    , pathFromTo
+    , getTrace
+    , getTraces
+    , getPathsFromTo
+    , getPathFromTo
     , executionGraph
     ) where
 
@@ -56,23 +57,26 @@ execute p e = runIdentity $ ExplorerM.execute p e
 executeAll :: (Eq c, Eq p, Eq o, Monoid o) => [p] -> Explorer p c o -> (Explorer p c o, o)
 executeAll p e = runIdentity $ ExplorerM.executeAll p e
 
+dynamicRevert :: Bool -> Ref -> Explorer p c o -> Maybe (Explorer p c o)
+dynamicRevert = ExplorerM.dynamicRevert
+
 revert :: ExplorerM.Ref -> Explorer p c o -> Maybe (Explorer p c o)
 revert = ExplorerM.revert
 
 incomingEdges :: Ref -> Explorer p c o -> [((Ref, c), (p, o), (Ref, c))]
 incomingEdges = ExplorerM.incomingEdges
 
-pathFromRootToCurr :: Explorer p c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-pathFromRootToCurr = ExplorerM.pathFromRootToCurr
+getTrace :: Explorer p c o -> [((Ref, c), (p, o), (Ref, c))]
+getTrace = ExplorerM.getTrace
 
-pathsFromRootToCurr :: Explorer p c o -> [[((Ref, c), (p, o), (Ref, c))]]
-pathsFromRootToCurr = ExplorerM.pathsFromRootToCurr
+getTraces :: Explorer p c o -> [[((Ref, c), (p, o), (Ref, c))]]
+getTraces = ExplorerM.getTraces
 
-pathsFromTo :: Ref -> Ref -> Explorer p c o -> [[((Ref, c), (p, o), (Ref, c))]]
-pathsFromTo = ExplorerM.pathsFromTo
+getPathsFromTo :: Explorer p c o -> Ref -> Ref -> [[((Ref, c), (p, o), (Ref, c))]]
+getPathsFromTo = ExplorerM.getPathsFromTo
 
-pathFromTo :: Ref -> Ref -> Explorer p c o -> Maybe [((Ref, c), (p, o), (Ref, c))]
-pathFromTo = ExplorerM.pathFromTo
+getPathFromTo :: Explorer p c o -> Ref -> Ref -> [((Ref, c), (p, o), (Ref, c))]
+getPathFromTo = ExplorerM.getPathFromTo
 
 executionGraph :: Explorer p c o -> (Ref, [Ref], [((Ref, c), (p, o), (Ref, c))])
 executionGraph = ExplorerM.executionGraph
