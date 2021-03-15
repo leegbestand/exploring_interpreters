@@ -136,7 +136,7 @@ library
                          , Funcons.Core.Values.TypesBuiltin
                          , Funcons.Core.Computations.TypesBuiltin
 
-executable funcons-repl 
+executable funcons-repl
    main-is:             REPL.hs
    other-extensions:    OverloadedStrings
    build-depends:        base >=4.8 && <= 5
@@ -154,11 +154,11 @@ executable funcons-repl
                         ,regex-applicative
                         ,random-strings
                         ,funcons-values >= 0.1.0.5
-                        ,ExploringInterpreter >= 0.1.0.1 
+                        ,exploring-interpreters>= 0.2.0.0
    hs-source-dirs:      src, manual, cbs
    default-language:    Haskell2010
  --  ghc-options:         -rtsopts
-  other-modules:        
+  other-modules:
         Funcons.Core.Computations.Abnormal.Abrupting.Abrupting
         Funcons.Core.Computations.Abnormal.Breaking.Breaking
         Funcons.Core.Computations.Abnormal.Continuing.Continuing
