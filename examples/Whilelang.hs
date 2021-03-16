@@ -112,13 +112,13 @@ initialConfig :: Config
 initialConfig = Config {cfgStore = Map.empty, cfgOutput = []}
 
 -- Definitial interpreter for the while language.
-definterp :: Command -> Config -> Config
-definterp c cfg = cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
+definterp :: Command -> Config -> Maybe Config
+definterp c cfg = Just cfg {cfgStore = newstore, cfgOutput = cfgOutput cfg ++ newout}
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
 
-definterpO :: Command -> Config -> (Config, [String])
-definterpO c cfg = (cfg {cfgStore = newstore}, newout)
+definterpO :: Command -> Config -> (Maybe Config, [String])
+definterpO c cfg = (Just $ cfg {cfgStore = newstore}, newout)
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
 
@@ -218,7 +218,7 @@ whileGraph :: WhileExplorer
 whileGraph = E.mkExplorerGraph definterp initialConfig
 
 whileGraphM :: WhileExplorerM
-whileGraphM = EM.mkExplorerGraph (\p c -> (\c -> (c,())) <$> definterpM p c) initialConfig
+whileGraphM = EM.mkExplorerGraph (\p c -> (\c -> (Just c,())) <$> definterpM p c) initialConfig
 
 whileGraphO :: WhileExplorerO
 whileGraphO = EP.mkExplorerGraph definterpO initialConfig

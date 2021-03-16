@@ -42,10 +42,10 @@ config = ExplorerM.config
 deref :: Explorer p c o -> Ref -> Maybe c
 deref = ExplorerM.deref
 
-wrap :: (Monad m, Monoid o) => (a -> b -> (b,o)) -> a -> b -> m (b, o)
+wrap :: (Monad m, Monoid o) => (a -> b -> (Maybe b,o)) -> a -> b -> m (Maybe b, o)
 wrap def p e = return $ def p e
 
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS:: (Show a, Eq a, Eq b, Monoid o) => (a -> b -> (b,o)) -> b -> Explorer a b o
+mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS:: (Show a, Eq a, Eq b, Monoid o) => (a -> b -> (Maybe b,o)) -> b -> Explorer a b o
 mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
 mkExplorerTree definterp conf = ExplorerM.mkExplorerTree (wrap definterp) conf
 mkExplorerGraph definterp conf = ExplorerM.mkExplorerGraph (wrap definterp) conf

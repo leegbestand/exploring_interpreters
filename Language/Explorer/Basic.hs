@@ -45,20 +45,14 @@ deref :: Explorer p c -> Ref -> Maybe c
 deref = ExplorerM.deref
 
 -- This should be able with func composition.
-wrap :: Monad m => (a -> b -> b) -> a -> b -> m (b, ())
+wrap :: Monad m => (a -> b -> Maybe b) -> a -> b -> m (Maybe b, ())
 wrap def p e = return $ (def p e, ())
 
 -- Constructor for a exploring interpreter.
-mkExplorerStack:: (Show a, Eq a, Eq b) => (a -> b -> b) -> b -> Explorer a b
+mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b) => (a -> b -> Maybe b) -> b -> Explorer a b
 mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
-
-mkExplorerTree:: (Show a, Eq a, Eq b) => (a -> b -> b) -> b -> Explorer a b
 mkExplorerTree definterp conf = ExplorerM.mkExplorerTree (wrap definterp) conf
-
-mkExplorerGraph :: (Show a, Eq a, Eq b) => (a -> b -> b) -> b -> Explorer a b
 mkExplorerGraph definterp conf = ExplorerM.mkExplorerGraph (wrap definterp) conf
-
-mkExplorerGSS :: (Show a, Eq a, Eq b) => (a -> b -> b) -> b -> Explorer a b
 mkExplorerGSS definterp conf = ExplorerM.mkExplorerGSS (wrap definterp) conf
 
 execute :: (Eq c, Eq p) =>  p -> Explorer p c -> Explorer p c

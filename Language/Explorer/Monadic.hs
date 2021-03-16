@@ -41,7 +41,7 @@ data Explorer programs m configs output where
     Explorer :: (Show programs, Eq programs, Eq configs, Monad m, Monoid output) =>
         { sharing :: Bool
         , backTracking :: Bool
-        , defInterp :: programs -> configs -> m (configs, output)
+        , defInterp :: programs -> configs -> m (Maybe configs, output)
         , config :: configs -- Cache the config
         , currRef :: Ref
         , genRef :: Ref
@@ -50,7 +50,7 @@ data Explorer programs m configs output where
         } -> Explorer programs m configs output
 
 mkExplorer :: (Show a, Eq a, Eq b, Monad m, Monoid o) =>
-  Bool -> Bool -> (a -> b -> m (b,o)) -> b -> Explorer a m b o
+  Bool -> Bool -> (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
 mkExplorer share backtrack definterp conf = Explorer
     { defInterp = definterp
     , config = conf
@@ -65,7 +65,7 @@ mkExplorer share backtrack definterp conf = Explorer
 initialRef :: Int
 initialRef = 1
 
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b, Monad m, Monoid o) => (a -> b -> m (b,o)) -> b -> Explorer a m b o
+mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b, Monad m, Monoid o) => (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
 mkExplorerStack = mkExplorer False True
 mkExplorerTree  = mkExplorer False False
 mkExplorerGraph = mkExplorer True False
@@ -95,11 +95,11 @@ updateConf e (p, newconf, output) =
         else addNewPath e p output newconf
 
 execute :: (Eq c, Eq p, Eq o, Monad m, Monoid o) =>  p -> Explorer p m c o -> m (Explorer p m c o, o)
-execute p e = do
-    (newconf,out) <- defInterp e p (config e)
-    return $ (updateConf e (p, newconf, out), out)
-
-
+execute p e =
+  do (mcfg, o) <- defInterp e p (config e)
+     case mcfg of
+       Just cfg -> return $ (updateConf e (p, cfg, o), o)
+       Nothing  -> return (e, o)
 
 executeAll :: (Eq c, Eq p, Eq o, Monad m, Monoid o) => [p] -> Explorer p m c o -> m (Explorer p m c o, o)
 executeAll ps exp = foldlM executeCollect (exp, mempty) ps
