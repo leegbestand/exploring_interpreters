@@ -14,6 +14,7 @@ module Language.Explorer.Pure
     , currRef
     , Ref
     , deref
+    , leaves
     , getTrace
     , getTraces
     , getPathsFromTo

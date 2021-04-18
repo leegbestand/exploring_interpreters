@@ -13,6 +13,7 @@ module Language.Explorer.Basic
     , currRef
     , Ref
     , deref
+    , leaves
     , getTrace
     , getTraces
     , getPathsFromTo
