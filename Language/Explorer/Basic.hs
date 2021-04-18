@@ -3,7 +3,7 @@ module Language.Explorer.Basic
     , execute
     , executeAll
     , revert
-    , dynamicRevert 
+    , dynamicRevert
     , ExplorerM.toTree
     , mkExplorerStack
     , mkExplorerTree
@@ -89,3 +89,6 @@ executionGraph :: Explorer p c -> (Ref, [Ref], [((Ref, c), p, (Ref, c))])
 executionGraph e = (curr, nodes, map removeOutput graph)
   where
     (curr, nodes, graph) = ExplorerM.executionGraph e
+
+leaves :: Explorer p c -> [(Ref, c)]
+leaves = ExplorerM.leaves

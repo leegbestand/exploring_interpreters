@@ -3,7 +3,7 @@ module Language.Explorer.Pure
     , execute
     , executeAll
     , revert
-    , dynamicRevert 
+    , dynamicRevert
     , ExplorerM.toTree
     , incomingEdges
     , mkExplorerStack
@@ -80,3 +80,6 @@ getPathFromTo = ExplorerM.getPathFromTo
 
 executionGraph :: Explorer p c o -> (Ref, [Ref], [((Ref, c), (p, o), (Ref, c))])
 executionGraph = ExplorerM.executionGraph
+
+leaves :: Explorer p c o -> [(Ref, c)]
+leaves = ExplorerM.leaves

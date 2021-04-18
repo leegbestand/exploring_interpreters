@@ -5,7 +5,7 @@ module Language.Explorer.Monadic
     , execute
     , executeAll
     , revert
-    , dynamicRevert 
+    , dynamicRevert
     , toTree
     , incomingEdges
     , mkExplorerStack
@@ -15,6 +15,7 @@ module Language.Explorer.Monadic
     , config
     , execEnv
     , currRef
+    , leaves
     , Ref
     , deref
     , getTrace
@@ -124,7 +125,7 @@ dynamicRevert backtrack r e =
 revert :: Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
 revert r e = dynamicRevert (backTracking e) r e
 
-  
+
 toTree :: Explorer p m c o -> Tree (Ref, c)
 toTree exp = mkTree initialRef
   where graph = execEnv exp
@@ -180,3 +181,14 @@ executionGraph exp =
     curr = currRef exp
     nodes = map fst (labNodes (execEnv exp))
     edges = map (\(s, t, p) -> ((s, fromJust $ deref exp s), p, (t, fromJust $ deref exp t)) ) (labEdges (execEnv exp))
+
+{-|
+  Returns all configurations that have not been the source for an execute action.
+  This corresponds to leaves in a tree or nodes without an outbound-edge in a graph.
+-}
+leaves :: Explorer p m c o -> [(Ref, c)]
+leaves exp = map refToPair leave_nodes
+  where
+    env = execEnv exp
+    refToPair = \r -> (r, fromJust $ deref exp r)
+    leave_nodes = nodes $ nfilter (\n -> (==0) $ outdeg env n) env

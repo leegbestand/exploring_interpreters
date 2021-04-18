@@ -1,8 +1,11 @@
-# Revision history for exploring-interpreters 
+# Revision history for exploring-interpreters
 
 ## 0.2.0.0 -- 2021-03-15
-* First official version. 
+* First official version.
 
 ## 0.3.0.0 -- 2021-03-16
 * Require that definitional interpreters return configurations in the Maybe monad.
   This adds support for run-time errors by returning Nothing when an errors occurs.
+
+## 0.3.1.0 -- 2021-04-18
+* This version adds the 'leaves' function to the exploring interpreter.
