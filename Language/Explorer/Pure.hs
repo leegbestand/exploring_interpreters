@@ -8,8 +8,6 @@ module Language.Explorer.Pure
     , incomingEdges
     , mkExplorerStack
     , mkExplorerTree
-    , mkExplorerGraph
-    , mkExplorerGSS
     , config
     , currRef
     , Ref
@@ -46,16 +44,14 @@ deref = ExplorerM.deref
 wrap :: (Monad m, Monoid o) => (a -> b -> (Maybe b,o)) -> a -> b -> m (Maybe b, o)
 wrap def p e = return $ def p e
 
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS:: (Show a, Eq a, Eq b, Monoid o) => (a -> b -> (Maybe b,o)) -> b -> Explorer a b o
-mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
-mkExplorerTree definterp conf = ExplorerM.mkExplorerTree (wrap definterp) conf
-mkExplorerGraph definterp conf = ExplorerM.mkExplorerGraph (wrap definterp) conf
-mkExplorerGSS definterp conf = ExplorerM.mkExplorerGSS (wrap definterp) conf
+mkExplorerStack, mkExplorerTree :: (Monoid o) => Bool -> (a -> b -> (Maybe b,o)) -> b -> Explorer a b o
+mkExplorerStack shadow definterp conf = ExplorerM.mkExplorerStack shadow (wrap definterp) conf
+mkExplorerTree shadow definterp conf = ExplorerM.mkExplorerTree shadow (wrap definterp) conf
 
-execute :: (Eq c, Eq p, Eq o, Monoid o) =>  p -> Explorer p c o -> (Explorer p c o, o)
+execute :: (Eq o, Monoid o) =>  p -> Explorer p c o -> (Explorer p c o, o)
 execute p e = runIdentity $ ExplorerM.execute p e
 
-executeAll :: (Eq c, Eq p, Eq o, Monoid o) => [p] -> Explorer p c o -> (Explorer p c o, o)
+executeAll :: (Eq o, Monoid o) => [p] -> Explorer p c o -> (Explorer p c o, o)
 executeAll p e = runIdentity $ ExplorerM.executeAll p e
 
 dynamicRevert :: Bool -> Ref -> Explorer p c o -> Maybe (Explorer p c o)

@@ -10,8 +10,6 @@ module Language.Explorer.Monadic
     , incomingEdges
     , mkExplorerStack
     , mkExplorerTree
-    , mkExplorerGraph
-    , mkExplorerGSS
     , config
     , execEnv
     , currRef
@@ -39,8 +37,8 @@ import Data.Maybe
 type Ref = Int
 
 data Explorer programs m configs output where
-    Explorer :: (Show programs, Eq programs, Eq configs, Monad m, Monoid output) =>
-        { sharing :: Bool
+    Explorer :: (Monad m, Monoid output) =>
+        { shadowing :: Bool -- Shadow the exploration tree in a shadow graph.
         , backTracking :: Bool
         , defInterp :: programs -> configs -> m (Maybe configs, output)
         , config :: configs -- Cache the config
@@ -50,27 +48,26 @@ data Explorer programs m configs output where
         , execEnv :: Gr Ref (programs, output)
         } -> Explorer programs m configs output
 
-mkExplorer :: (Show a, Eq a, Eq b, Monad m, Monoid o) =>
+
+mkExplorer :: (Monad m, Monoid o) =>
   Bool -> Bool -> (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
-mkExplorer share backtrack definterp conf = Explorer
+mkExplorer backtrack shadow definterp conf = Explorer
     { defInterp = definterp
     , config = conf
     , genRef = 1 -- Currently generate references by increasing a counter.
     , currRef = initialRef
     , cmap = IntMap.fromList [(initialRef, conf)]
     , execEnv = mkGraph [(initialRef, initialRef)] []
-    , sharing = share
+    , shadowing = shadow
     , backTracking = backtrack
 }
 
 initialRef :: Int
 initialRef = 1
 
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b, Monad m, Monoid o) => (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
-mkExplorerStack = mkExplorer False True
-mkExplorerTree  = mkExplorer False False
-mkExplorerGraph = mkExplorer True False
-mkExplorerGSS   = mkExplorer True True
+mkExplorerStack, mkExplorerTree :: (Monad m, Monoid o) => Bool -> (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
+mkExplorerStack = mkExplorer True
+mkExplorerTree  = mkExplorer False
 
 deref :: Explorer p m c o -> Ref -> Maybe c
 deref e r = IntMap.lookup r (cmap e)
@@ -83,9 +80,7 @@ addNewPath e p o c = e { config = c, currRef = newref, genRef = newref, cmap = I
      execEnv = insNode (newref, newref) $ insEdge (currRef e, newref, (p,o)) (execEnv e)}
      where newref = genRef e + 1
 
-updateConf :: (Eq c, Eq p, Eq o) => Explorer p m c o -> (p, c, o) -> Explorer p m c o
-updateConf e (p, newconf, output) =
-    if sharing e
+{--    if sharing e
         then case findRef e newconf of
             Just (r, c) ->
                 if hasLEdge (execEnv e) (currRef e, r, (p,output))
@@ -93,16 +88,19 @@ updateConf e (p, newconf, output) =
                     else e  { config = newconf, currRef = r
                             , execEnv = insEdge (currRef e, r, (p,output)) (execEnv e) }
             Nothing -> addNewPath e p output newconf
-        else addNewPath e p output newconf
+--}
 
-execute :: (Eq c, Eq p, Eq o, Monad m, Monoid o) =>  p -> Explorer p m c o -> m (Explorer p m c o, o)
+updateConf :: Eq o => Explorer p m c o -> (p, c, o) -> Explorer p m c o
+updateConf e (p, newconf, output) = addNewPath e p output newconf
+
+execute :: (Eq o, Monad m, Monoid o) =>  p -> Explorer p m c o -> m (Explorer p m c o, o)
 execute p e =
   do (mcfg, o) <- defInterp e p (config e)
      case mcfg of
        Just cfg -> return $ (updateConf e (p, cfg, o), o)
        Nothing  -> return (e, o)
 
-executeAll :: (Eq c, Eq p, Eq o, Monad m, Monoid o) => [p] -> Explorer p m c o -> m (Explorer p m c o, o)
+executeAll :: (Eq o, Monad m, Monoid o) => [p] -> Explorer p m c o -> m (Explorer p m c o, o)
 executeAll ps exp = foldlM executeCollect (exp, mempty) ps
   where executeCollect (exp, out) p = do (res, out') <- execute p exp
                                          return (res, out `mappend` out')
@@ -172,6 +170,7 @@ getPathFromTo exp from to =
   case getPathsFromTo exp from to of
     [] -> []
     (x:_) -> x
+
 
 
 executionGraph :: Explorer p m c o -> (Ref, [Ref], [((Ref, c), (p, o), (Ref, c))])

@@ -7,8 +7,6 @@ module Language.Explorer.Basic
     , ExplorerM.toTree
     , mkExplorerStack
     , mkExplorerTree
-    , mkExplorerGraph
-    , mkExplorerGSS
     , config
     , currRef
     , Ref
@@ -50,16 +48,14 @@ wrap :: Monad m => (a -> b -> Maybe b) -> a -> b -> m (Maybe b, ())
 wrap def p e = return $ (def p e, ())
 
 -- Constructor for a exploring interpreter.
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b) => (a -> b -> Maybe b) -> b -> Explorer a b
-mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
-mkExplorerTree definterp conf = ExplorerM.mkExplorerTree (wrap definterp) conf
-mkExplorerGraph definterp conf = ExplorerM.mkExplorerGraph (wrap definterp) conf
-mkExplorerGSS definterp conf = ExplorerM.mkExplorerGSS (wrap definterp) conf
+mkExplorerStack, mkExplorerTree :: Bool -> (a -> b -> Maybe b) -> b -> Explorer a b
+mkExplorerStack shadow definterp conf = ExplorerM.mkExplorerStack shadow (wrap definterp) conf
+mkExplorerTree shadow definterp conf = ExplorerM.mkExplorerTree shadow (wrap definterp) conf
 
-execute :: (Eq c, Eq p) =>  p -> Explorer p c -> Explorer p c
+execute :: p -> Explorer p c -> Explorer p c
 execute p e = fst $ runIdentity $ ExplorerM.execute p e
 
-executeAll :: (Eq c, Eq p) => [p] -> Explorer p c -> Explorer p c
+executeAll :: [p] -> Explorer p c -> Explorer p c
 executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
 
 dynamicRevert :: Bool -> Ref -> Explorer p c -> Maybe (Explorer p c)
