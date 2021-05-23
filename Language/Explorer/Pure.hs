@@ -1,3 +1,5 @@
+{-# LANGUAGE ConstraintKinds #-}
+
 module Language.Explorer.Pure
     ( Explorer
     , execute
@@ -31,6 +33,8 @@ import Data.Foldable
 -- the same.
 type Ref = ExplorerM.Ref
 type Explorer a b o = ExplorerM.Explorer a Identity b o
+type PureLanguage p c o = (Eq p, Eq o, Monoid o)
+
 
 currRef :: Explorer a b o -> Ref
 currRef = ExplorerM.currRef
@@ -44,14 +48,14 @@ deref = ExplorerM.deref
 wrap :: (Monad m, Monoid o) => (a -> b -> (Maybe b,o)) -> a -> b -> m (Maybe b, o)
 wrap def p e = return $ def p e
 
-mkExplorerStack, mkExplorerTree :: (Monoid o) => Bool -> (a -> b -> (Maybe b,o)) -> b -> Explorer a b o
-mkExplorerStack shadow definterp conf = ExplorerM.mkExplorerStack shadow (wrap definterp) conf
-mkExplorerTree shadow definterp conf = ExplorerM.mkExplorerTree shadow (wrap definterp) conf
+mkExplorerStack, mkExplorerTree :: PureLanguage p c o => Bool -> (c -> c -> Bool) -> (p -> c -> (Maybe c, o)) -> c -> Explorer p c o
+mkExplorerStack shadow shadowEq definterp conf = ExplorerM.mkExplorerStack shadow shadowEq (wrap definterp) conf
+mkExplorerTree shadow shadowEq definterp conf = ExplorerM.mkExplorerTree shadow shadowEq (wrap definterp) conf
 
-execute :: (Eq o, Monoid o) =>  p -> Explorer p c o -> (Explorer p c o, o)
+execute :: PureLanguage p c o =>  p -> Explorer p c o -> (Explorer p c o, o)
 execute p e = runIdentity $ ExplorerM.execute p e
 
-executeAll :: (Eq o, Monoid o) => [p] -> Explorer p c o -> (Explorer p c o, o)
+executeAll :: PureLanguage p c o => [p] -> Explorer p c o -> (Explorer p c o, o)
 executeAll p e = runIdentity $ ExplorerM.executeAll p e
 
 dynamicRevert :: Bool -> Ref -> Explorer p c o -> Maybe (Explorer p c o)

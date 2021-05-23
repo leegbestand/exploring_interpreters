@@ -1,3 +1,5 @@
+{-# LANGUAGE ConstraintKinds #-}
+
 module Language.Explorer.Basic
     ( Explorer
     , execute
@@ -33,6 +35,8 @@ import Data.Graph.Inductive.Graph (emap)
 -- the same.
 type Ref = ExplorerM.Ref
 type Explorer a b = ExplorerM.Explorer a Identity b ()
+type BasicLanguage p c = Eq p
+
 
 currRef :: Explorer a b -> Ref
 currRef = ExplorerM.currRef
@@ -48,14 +52,14 @@ wrap :: Monad m => (a -> b -> Maybe b) -> a -> b -> m (Maybe b, ())
 wrap def p e = return $ (def p e, ())
 
 -- Constructor for a exploring interpreter.
-mkExplorerStack, mkExplorerTree :: Bool -> (a -> b -> Maybe b) -> b -> Explorer a b
-mkExplorerStack shadow definterp conf = ExplorerM.mkExplorerStack shadow (wrap definterp) conf
-mkExplorerTree shadow definterp conf = ExplorerM.mkExplorerTree shadow (wrap definterp) conf
+mkExplorerStack, mkExplorerTree :: BasicLanguage p c => Bool -> (c -> c -> Bool) -> (p -> c -> Maybe c) -> c -> Explorer p c
+mkExplorerStack shadow shadowEq definterp conf = ExplorerM.mkExplorerStack shadow shadowEq (wrap definterp) conf
+mkExplorerTree shadow shadowEq definterp conf = ExplorerM.mkExplorerTree shadow shadowEq (wrap definterp) conf
 
-execute :: p -> Explorer p c -> Explorer p c
+execute :: BasicLanguage p c => p -> Explorer p c -> Explorer p c
 execute p e = fst $ runIdentity $ ExplorerM.execute p e
 
-executeAll :: [p] -> Explorer p c -> Explorer p c
+executeAll :: BasicLanguage p c => [p] -> Explorer p c -> Explorer p c
 executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
 
 dynamicRevert :: Bool -> Ref -> Explorer p c -> Maybe (Explorer p c)

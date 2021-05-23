@@ -1,4 +1,6 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ConstraintKinds #-}
+
 
 module Language.Explorer.Monadic
     ( Explorer
@@ -15,12 +17,15 @@ module Language.Explorer.Monadic
     , currRef
     , leaves
     , Ref
+    , Language
     , deref
     , getTrace
     , getTraces
     , getPathsFromTo
     , getPathFromTo
     , executionGraph
+    , shadowExecEnv
+    , findNodeRef
     ) where
 
 import Data.Graph.Inductive.Graph
@@ -35,9 +40,10 @@ import Data.Foldable
 import Data.Maybe
 
 type Ref = Int
+type Language p m c o = (Eq p, Eq o, Monad m, Monoid o)
 
 data Explorer programs m configs output where
-    Explorer :: (Monad m, Monoid output) =>
+    Explorer :: (Eq programs, Eq output, Monad m, Monoid output) =>
         { shadowing :: Bool -- Shadow the exploration tree in a shadow graph.
         , backTracking :: Bool
         , defInterp :: programs -> configs -> m (Maybe configs, output)
@@ -46,61 +52,83 @@ data Explorer programs m configs output where
         , genRef :: Ref
         , cmap :: IntMap.IntMap configs
         , execEnv :: Gr Ref (programs, output)
+        , shadowExecEnv :: Gr [Ref] (programs, output)
+        , configEq :: configs -> configs -> Bool
         } -> Explorer programs m configs output
 
 
-mkExplorer :: (Monad m, Monoid o) =>
-  Bool -> Bool -> (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
-mkExplorer backtrack shadow definterp conf = Explorer
+mkExplorer :: Language p m c o => Bool -> Bool -> (c -> c -> Bool) -> (p -> c -> m (Maybe c, o)) -> c -> Explorer p m c o
+mkExplorer backtrack shadow shadowEq definterp conf = Explorer
     { defInterp = definterp
     , config = conf
     , genRef = 1 -- Currently generate references by increasing a counter.
     , currRef = initialRef
     , cmap = IntMap.fromList [(initialRef, conf)]
     , execEnv = mkGraph [(initialRef, initialRef)] []
+    , shadowExecEnv = mkGraph [(initialRef, [initialRef])] []
     , shadowing = shadow
     , backTracking = backtrack
+    , configEq = shadowEq
 }
 
 initialRef :: Int
 initialRef = 1
 
-mkExplorerStack, mkExplorerTree :: (Monad m, Monoid o) => Bool -> (a -> b -> m (Maybe b,o)) -> b -> Explorer a m b o
+mkExplorerStack, mkExplorerTree :: Language p m c o  => Bool -> (c -> c -> Bool) -> (p -> c -> m (Maybe c, o)) -> c -> Explorer p m c o
 mkExplorerStack = mkExplorer True
 mkExplorerTree  = mkExplorer False
 
 deref :: Explorer p m c o -> Ref -> Maybe c
 deref e r = IntMap.lookup r (cmap e)
 
-findRef :: Eq c => Explorer p m c o -> c -> Maybe (Ref, c)
-findRef e c = find (\(r, c') -> c' == c) (IntMap.toList (cmap e))
+findRef :: Explorer p m c o -> c -> (c -> Bool) -> Maybe (Ref, c)
+findRef e c eq = find (\(r, c') -> eq c') (IntMap.toList (cmap e))
 
 addNewPath :: Explorer p m c o -> p -> o -> c -> Explorer p m c o
 addNewPath e p o c = e { config = c, currRef = newref, genRef = newref, cmap = IntMap.insert newref c (cmap e),
      execEnv = insNode (newref, newref) $ insEdge (currRef e, newref, (p,o)) (execEnv e)}
      where newref = genRef e + 1
 
-{--    if sharing e
-        then case findRef e newconf of
-            Just (r, c) ->
-                if hasLEdge (execEnv e) (currRef e, r, (p,output))
-                    then e  { config = newconf, currRef = r }
-                    else e  { config = newconf, currRef = r
-                            , execEnv = insEdge (currRef e, r, (p,output)) (execEnv e) }
-            Nothing -> addNewPath e p output newconf
---}
 
-updateConf :: Eq o => Explorer p m c o -> (p, c, o) -> Explorer p m c o
-updateConf e (p, newconf, output) = addNewPath e p output newconf
+findNodeRef :: Explorer p m c o -> Ref -> Ref
+findNodeRef e r = fst $ fromJust $ find (\(_, rs) -> r `elem` rs) $ labNodes (shadowExecEnv e)
 
-execute :: (Eq o, Monad m, Monoid o) =>  p -> Explorer p m c o -> m (Explorer p m c o, o)
+
+updateShadowEnv :: Language p m c o => Explorer p m c o -> (p, c, o, Ref, Ref) -> Explorer p m c o
+updateShadowEnv e (p, newconf, output, newref, oldref) =
+  case findRef e newconf (configEq e newconf) of
+    Just (r', _) ->
+      if hasLEdge (shadowExecEnv e) (nref, findNodeRef e r', (p, output))
+        then e
+        else e {
+          shadowExecEnv = updateLabel (findNodeRef e r', newref, p, output) $ insEdge (nref, findNodeRef e r', (p, output)) $ shadowExecEnv e
+        }
+    Nothing -> e {
+      shadowExecEnv = insNode (newref, [newref]) $ insEdge (nref, newref, (p, output)) $ shadowExecEnv e
+    }
+    where
+      nref = findNodeRef e oldref
+      updateLabel (target, add_to_label, p, output) gr =
+        case match target gr of
+          (Just (toadj, node, label, fromadj), decomgr) -> (toadj, node, add_to_label : label, fromadj) & decomgr
+          _ -> error "Shadow execution environment is inconsistent."
+
+
+updateExecEnvs :: Language p m c o => Explorer p m c o -> (p, c, o) -> Explorer p m c o
+updateExecEnvs e (p, newconf, output)
+  | shadowing e = addNewPath (updateShadowEnv e (p, newconf, output, (currRef newexplorer), (currRef e))) p output newconf
+  | otherwise = newexplorer
+  where
+    newexplorer = addNewPath e p output newconf
+
+execute :: Language p m c o =>  p -> Explorer p m c o -> m (Explorer p m c o, o)
 execute p e =
   do (mcfg, o) <- defInterp e p (config e)
      case mcfg of
-       Just cfg -> return $ (updateConf e (p, cfg, o), o)
+       Just cfg -> return (updateExecEnvs e (p, cfg, o), o)
        Nothing  -> return (e, o)
 
-executeAll :: (Eq o, Monad m, Monoid o) => [p] -> Explorer p m c o -> m (Explorer p m c o, o)
+executeAll :: Language p m c o => [p] -> Explorer p m c o -> m (Explorer p m c o, o)
 executeAll ps exp = foldlM executeCollect (exp, mempty) ps
   where executeCollect (exp, out) p = do (res, out') <- execute p exp
                                          return (res, out `mappend` out')
@@ -108,16 +136,32 @@ executeAll ps exp = foldlM executeCollect (exp, mempty) ps
 deleteMap :: [Ref] -> IntMap.IntMap a -> IntMap.IntMap a
 deleteMap xs m = foldl (flip IntMap.delete) m xs
 
+
+deleteFromShadowEnv :: [(Ref, Ref)] -> Gr [Ref] po -> Gr [Ref] po
+deleteFromShadowEnv [(l, r)] gr = case match r gr of
+  (Just (toadj, node, label, fromadj), decomgr) -> (toadj, node, label \\ [l], fromadj) & decomgr
+  _ -> error "Inconsistent shadow env."
+deleteFromShadowEnv (x:xs) gr = deleteFromShadowEnv xs (deleteFromShadowEnv [x] gr)
+
+
 dynamicRevert :: Bool -> Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
 dynamicRevert backtrack r e =
   case IntMap.lookup r (cmap e) of
-    Just c | backtrack -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
+    Just c | backtrack && (shadowing e) -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap', shadowExecEnv = shadowEnv'' }
+           | backtrack -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
            | otherwise -> Just e { currRef = r, config = c }
     Nothing            -> Nothing
-    where nodesToDel = reachable r (execEnv e) \\ [r]
-          edgesToDel = filter (\(s, t) -> s `elem` nodesToDel || t `elem` nodesToDel) (edges (execEnv e))
-          execEnv'   = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
-          cmap'      = deleteMap nodesToDel (cmap e)
+    where nodesToDel  = reachable r (execEnv e) \\ [r]
+          edgesToDel  = filter (\(s, t) -> s `elem` nodesToDel || t `elem` nodesToDel) (edges (execEnv e))
+          execEnv'    = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
+          cmap'       = deleteMap nodesToDel (cmap e)
+          shadowEnv'  = deleteFromShadowEnv (map (\r -> (r, findNodeRef e r )) nodesToDel) (shadowExecEnv e)
+          --- This should be easier, but outgoing edges are not deleted when a node is deleted...
+          nodesToDel' = map fst (filter (\(r, labels) -> labels == []) $ labNodes (shadowEnv'))
+          edgesToDel' = filter (\(s, t) -> s `elem` nodesToDel' || t `elem` nodesToDel') (edges shadowEnv')
+          shadowEnv'' = (delEdges edgesToDel' . delNodes nodesToDel') shadowEnv'
+
+
 
 
 revert :: Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
