@@ -94,3 +94,9 @@ executionGraph e = (curr, nodes, map removeOutput graph)
 
 leaves :: Explorer p c -> [(Ref, c)]
 leaves = ExplorerM.leaves
+
+toExport :: Explorer p c -> (Ref, [(Ref, c)], [(Ref, Ref, p)])
+toExport exp = let (curr, nds, edges) = ExplorerM.toExport exp in (curr, nds, map (\(r1, r2, (p, o)) -> (r1, r2, p)) edges)
+
+fromExport :: Explorer p c -> (Ref, [(Ref, c)], [(Ref, Ref, p)]) -> Explorer p c
+fromExport exp (curr, nds, edgs) = ExplorerM.fromExport exp (curr, nds, map (\(r1, r2, p) -> (r1, r2, (p, ()))) edgs)

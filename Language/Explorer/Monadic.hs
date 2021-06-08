@@ -24,6 +24,8 @@ module Language.Explorer.Monadic
     , getPathsFromTo
     , getPathFromTo
     , executionGraph
+    , toExport
+    , fromExport
     ) where
 
 import Data.Graph.Inductive.Graph
@@ -193,3 +195,10 @@ leaves exp = map refToPair leave_nodes
     env = execEnv exp
     refToPair = \r -> (r, fromJust $ deref exp r)
     leave_nodes = nodes $ nfilter (\n -> (==0) $ outdeg env n) env
+
+
+toExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))])
+toExport exp = (currRef exp, IntMap.toList $ cmap exp, labEdges $ execEnv exp)
+
+fromExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))]) -> Explorer p m c o
+fromExport exp (curr, nds, edgs) = exp { currRef = curr, cmap = IntMap.fromList nds, execEnv = mkGraph (map (\(x, _) -> (x, x)) nds) edgs }

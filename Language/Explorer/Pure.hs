@@ -85,3 +85,9 @@ executionGraph = ExplorerM.executionGraph
 
 leaves :: Explorer p c o -> [(Ref, c)]
 leaves = ExplorerM.leaves
+
+toExport :: Explorer p c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))])
+toExport = ExplorerM.toExport
+
+fromExport :: Explorer p c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))]) -> Explorer p c o
+fromExport = ExplorerM.fromExport
