@@ -13,6 +13,7 @@ module Language.Explorer.Pure
     , config
     , currRef
     , Ref
+    , ExplorerM.initialRef
     , deref
     , leaves
     , getTrace

@@ -19,6 +19,7 @@ module Language.Explorer.Basic
     , getPathsFromTo
     , getPathFromTo
     , executionGraph
+    , ExplorerM.initialRef
     ) where
 
 import qualified Language.Explorer.Monadic as ExplorerM

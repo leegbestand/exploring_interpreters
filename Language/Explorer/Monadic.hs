@@ -15,6 +15,7 @@ module Language.Explorer.Monadic
     , config
     , execEnv
     , currRef
+    , initialRef
     , leaves
     , Ref
     , deref
