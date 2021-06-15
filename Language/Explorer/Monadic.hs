@@ -4,14 +4,13 @@
 
 module Language.Explorer.Monadic
     ( Explorer
+    , mkExplorer
     , execute
     , executeAll
     , revert
-    , dynamicRevert
+    , jump
     , toTree
     , incomingEdges
-    , mkExplorerStack
-    , mkExplorerTree
     , config
     , execEnv
     , currRef
@@ -25,7 +24,6 @@ module Language.Explorer.Monadic
     , getPathFromTo
     , executionGraph
     , shadowExecEnv
-    , findNodeRef
     ) where
 
 import Data.Graph.Inductive.Graph
@@ -43,9 +41,8 @@ type Ref = Int
 type Language p m c o = (Eq p, Eq o, Monad m, Monoid o)
 
 data Explorer programs m configs output where
-    Explorer :: (Eq programs, Eq output, Monad m, Monoid output) =>
+    Explorer :: Language programs m configs output =>
         { shadowing :: Bool -- Shadow the exploration tree in a shadow graph.
-        , backTracking :: Bool
         , defInterp :: programs -> configs -> m (Maybe configs, output)
         , config :: configs -- Cache the config
         , currRef :: Ref
@@ -57,8 +54,8 @@ data Explorer programs m configs output where
         } -> Explorer programs m configs output
 
 
-mkExplorer :: Language p m c o => Bool -> Bool -> (c -> c -> Bool) -> (p -> c -> m (Maybe c, o)) -> c -> Explorer p m c o
-mkExplorer backtrack shadow shadowEq definterp conf = Explorer
+mkExplorer :: Language p m c o => Bool -> (c -> c -> Bool) -> (p -> c -> m (Maybe c, o)) -> c -> Explorer p m c o
+mkExplorer shadow shadowEq definterp conf = Explorer
     { defInterp = definterp
     , config = conf
     , genRef = 1 -- Currently generate references by increasing a counter.
@@ -67,16 +64,14 @@ mkExplorer backtrack shadow shadowEq definterp conf = Explorer
     , execEnv = mkGraph [(initialRef, initialRef)] []
     , shadowExecEnv = mkGraph [(initialRef, [initialRef])] []
     , shadowing = shadow
-    , backTracking = backtrack
     , configEq = shadowEq
 }
 
 initialRef :: Int
 initialRef = 1
 
-mkExplorerStack, mkExplorerTree :: Language p m c o  => Bool -> (c -> c -> Bool) -> (p -> c -> m (Maybe c, o)) -> c -> Explorer p m c o
-mkExplorerStack = mkExplorer True
-mkExplorerTree  = mkExplorer False
+mkExplorerNoSharing :: Language p m c o  => (p -> c -> m (Maybe c, o)) -> c -> Explorer p m c o
+mkExplorerNoSharing = mkExplorer False (\_ -> \_ -> False)
 
 deref :: Explorer p m c o -> Ref -> Maybe c
 deref e r = IntMap.lookup r (cmap e)
@@ -90,24 +85,25 @@ addNewPath e p o c = e { config = c, currRef = newref, genRef = newref, cmap = I
      where newref = genRef e + 1
 
 
-findNodeRef :: Explorer p m c o -> Ref -> Ref
-findNodeRef e r = fst $ fromJust $ find (\(_, rs) -> r `elem` rs) $ labNodes (shadowExecEnv e)
+findNodeRef :: Gr [Ref] (p, o) -> Ref -> Ref
+findNodeRef g r = fst $ fromJust $ find (\(_, rs) -> r `elem` rs) $ labNodes g
 
 
 updateShadowEnv :: Language p m c o => Explorer p m c o -> (p, c, o, Ref, Ref) -> Explorer p m c o
 updateShadowEnv e (p, newconf, output, newref, oldref) =
   case findRef e newconf (configEq e newconf) of
     Just (r', _) ->
-      if hasLEdge (shadowExecEnv e) (nref, findNodeRef e r', (p, output))
+      if hasLEdge shadowEnv (nref, findNodeRef shadowEnv r', (p, output))
         then e
         else e {
-          shadowExecEnv = updateLabel (findNodeRef e r', newref, p, output) $ insEdge (nref, findNodeRef e r', (p, output)) $ shadowExecEnv e
+          shadowExecEnv = updateLabel (findNodeRef shadowEnv r', newref, p, output) $ insEdge (nref, findNodeRef shadowEnv r', (p, output)) shadowEnv
         }
     Nothing -> e {
       shadowExecEnv = insNode (newref, [newref]) $ insEdge (nref, newref, (p, output)) $ shadowExecEnv e
     }
     where
-      nref = findNodeRef e oldref
+      shadowEnv = shadowExecEnv e
+      nref = findNodeRef shadowEnv oldref
       updateLabel (target, add_to_label, p, output) gr =
         case match target gr of
           (Just (toadj, node, label, fromadj), decomgr) -> (toadj, node, add_to_label : label, fromadj) & decomgr
@@ -143,30 +139,34 @@ deleteFromShadowEnv [(l, r)] gr = case match r gr of
   _ -> error "Inconsistent shadow env."
 deleteFromShadowEnv (x:xs) gr = deleteFromShadowEnv xs (deleteFromShadowEnv [x] gr)
 
+cleanEdges :: [Ref] -> [(Ref, Ref, (p, o))] -> [(Ref, Ref, (p, o))]
+cleanEdges ref edg = filter (\(s, t, l) -> not $ t `elem` ref) edg
 
-dynamicRevert :: Bool -> Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
-dynamicRevert backtrack r e =
-  case IntMap.lookup r (cmap e) of
-    Just c | backtrack && (shadowing e) -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap', shadowExecEnv = shadowEnv'' }
-           | backtrack -> Just e { execEnv = execEnv', currRef = r, config = c, cmap = cmap'}
-           | otherwise -> Just e { currRef = r, config = c }
-    Nothing            -> Nothing
-    where nodesToDel  = reachable r (execEnv e) \\ [r]
-          edgesToDel  = filter (\(s, t) -> s `elem` nodesToDel || t `elem` nodesToDel) (edges (execEnv e))
-          execEnv'    = (delEdges edgesToDel . delNodes nodesToDel) (execEnv e)
-          cmap'       = deleteMap nodesToDel (cmap e)
-          shadowEnv'  = deleteFromShadowEnv (map (\r -> (r, findNodeRef e r )) nodesToDel) (shadowExecEnv e)
-          --- This should be easier, but outgoing edges are not deleted when a node is deleted...
-          nodesToDel' = map fst (filter (\(r, labels) -> labels == []) $ labNodes (shadowEnv'))
-          edgesToDel' = filter (\(s, t) -> s `elem` nodesToDel' || t `elem` nodesToDel') (edges shadowEnv')
-          shadowEnv'' = (delEdges edgesToDel' . delNodes nodesToDel') shadowEnv'
-
-
+cleanShadowEnv :: Bool -> [Ref] -> Gr [Ref] (p, o) -> Gr [Ref] (p, o)
+cleanShadowEnv False _ g = g
+cleanShadowEnv True nds g = shadowEnv''
+  where
+    shadowEnv' = deleteFromShadowEnv (map (\r -> (r, findNodeRef g r)) nds) g
+    nodesToDel' = map fst (filter (\(r, labels) -> labels == []) $ labNodes (shadowEnv'))
+    edgesToDel' = filter (\(s, t) -> s `elem` nodesToDel' || t `elem` nodesToDel') (edges shadowEnv')
+    shadowEnv'' = (delEdges edgesToDel' . delNodes nodesToDel') shadowEnv'
 
 
 revert :: Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
-revert r e = dynamicRevert (backTracking e) r e
+revert r e
+  | currRef e `elem` reachNodes =
+      jump r e >>= \e' -> return $ e' { execEnv = mkGraph (zip remainNodes remainNodes) $ cleanEdges reachNodes (labEdges $ execEnv e')
+                                      ,  cmap = deleteMap reachNodes (cmap e')
+                                      , shadowExecEnv = cleanShadowEnv (shadowing e') reachNodes (shadowExecEnv e')}
+  | otherwise = Nothing
+  where
+    reachNodes = reachable r (execEnv e) \\ [r]
+    remainNodes = nodes (execEnv e) \\ reachNodes
 
+jump :: Ref -> Explorer p m c o -> Maybe (Explorer p m c o)
+jump r e = case deref e r of
+             (Just c) -> return $ e { config = c, currRef = r }
+             Nothing -> Nothing
 
 toTree :: Explorer p m c o -> Tree (Ref, c)
 toTree exp = mkTree initialRef
@@ -179,14 +179,6 @@ incomingEdges :: Ref -> Explorer p m c o -> [((Ref, c), (p, o), (Ref, c))]
 incomingEdges ref e = foldr (\(s, t, l) acc ->  [((s, unpack s), l, (t, unpack t))] ++ acc) [] (filter (\(_, t, _) -> t == ref) (labEdges (execEnv e)))
   where
     unpack ref = fromJust $ deref e ref
-
-
-transformToRealGraph :: Gr Ref p -> Gr Ref Int
-transformToRealGraph g = mkGraph (labNodes g) (map (\(s, t) -> (s, t, 1)) (edges g))
-
-transformToPairs :: [Ref] -> [(Ref, Ref)]
-transformToPairs (s:t:xs) = (s, t) : transformToPairs (t:xs)
-transformToPairs _ = []
 
 getTrace :: Explorer p m c o -> [((Ref, c), (p, o), (Ref, c))]
 getTrace e = getPathFromTo e initialRef (currRef e)
@@ -235,3 +227,4 @@ leaves exp = map refToPair leave_nodes
     env = execEnv exp
     refToPair = \r -> (r, fromJust $ deref exp r)
     leave_nodes = nodes $ nfilter (\n -> (==0) $ outdeg env n) env
+

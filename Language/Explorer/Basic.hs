@@ -2,13 +2,11 @@
 
 module Language.Explorer.Basic
     ( Explorer
+    , mkExplorer
     , execute
     , executeAll
     , revert
-    , dynamicRevert
     , ExplorerM.toTree
-    , mkExplorerStack
-    , mkExplorerTree
     , config
     , currRef
     , Ref
@@ -37,6 +35,8 @@ type Ref = ExplorerM.Ref
 type Explorer a b = ExplorerM.Explorer a Identity b ()
 type BasicLanguage p c = Eq p
 
+mkExplorer :: BasicLanguage p c => Bool -> (c -> c -> Bool) -> (p -> c -> Maybe c) -> c -> Explorer p c
+mkExplorer shadow eqfunc definterp initialConf = ExplorerM.mkExplorer shadow eqfunc (wrap definterp) initialConf
 
 currRef :: Explorer a b -> Ref
 currRef = ExplorerM.currRef
@@ -51,19 +51,11 @@ deref = ExplorerM.deref
 wrap :: Monad m => (a -> b -> Maybe b) -> a -> b -> m (Maybe b, ())
 wrap def p e = return $ (def p e, ())
 
--- Constructor for a exploring interpreter.
-mkExplorerStack, mkExplorerTree :: BasicLanguage p c => Bool -> (c -> c -> Bool) -> (p -> c -> Maybe c) -> c -> Explorer p c
-mkExplorerStack shadow shadowEq definterp conf = ExplorerM.mkExplorerStack shadow shadowEq (wrap definterp) conf
-mkExplorerTree shadow shadowEq definterp conf = ExplorerM.mkExplorerTree shadow shadowEq (wrap definterp) conf
-
 execute :: BasicLanguage p c => p -> Explorer p c -> Explorer p c
 execute p e = fst $ runIdentity $ ExplorerM.execute p e
 
 executeAll :: BasicLanguage p c => [p] -> Explorer p c -> Explorer p c
 executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
-
-dynamicRevert :: Bool -> Ref -> Explorer p c -> Maybe (Explorer p c)
-dynamicRevert = ExplorerM.dynamicRevert
 
 revert :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
 revert = ExplorerM.revert

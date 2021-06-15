@@ -2,6 +2,7 @@ module Whilelang where
 
 import qualified Data.Map as Map
 import Data.List
+import Data.Maybe
 import Data.Graph.Inductive (emap)
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
@@ -149,7 +150,7 @@ do_3 p (e, o) = (e', o ++ o')
   where (e', o') = EP.execute p e
 
 start :: IO WhileExplorer
-start = return whileTree
+start = return whileExplorer
 
 -- startM :: IO WhileExplorerM
 -- startM = return whileTree
@@ -162,7 +163,21 @@ session1 = start >>=
   do_ (assign "x" (intToExpr 1)) >>=
   do_ (assign "y" (Id "x")) >>=
   do_ (assign "x" (intToExpr 1)) >>=
-  do_ (Print (Id "y"))
+  do_ (Print (Id "y")) >>=
+  do_ (Print (Id "x")) . fromJust . EM.jump 2 >>=
+  do_ (assign "z" (intToExpr 100)) >>=
+  do_ (Print (Id "z")) >>=
+  do_ (Print (Id "x")) . fromJust . EM.revert 2 
+
+
+sessionS :: IO WhileExplorer
+sessionS = start >>=
+  do_ (assign "x" (intToExpr 1)) >>=
+  do_ (assign "y" (Id "x")) >>=
+  do_ (assign "x" (intToExpr 1)) >>=
+  do_ (assign "z" (intToExpr 20)) >>=
+  do_ (assign "y" (Id "x"))
+
 
 
 -- -- When using sharing, this results in 3 configurations and not 4,
@@ -215,11 +230,8 @@ assign = Assign
 wseq :: Command -> Command -> Command
 wseq = Seq
 
-whileTree :: WhileExplorer
-whileTree = E.mkExplorerTree True (\c -> \c -> False) definterp initialConfig
-
-whileStack :: WhileExplorer
-whileStack = E.mkExplorerStack True (==) definterp initialConfig
+whileExplorer :: WhileExplorer
+whileExplorer = E.mkExplorer True (==) definterp initialConfig
 
 whileExample = Seq (Assign "x" (intToExpr 0)) (while (Leq (Id "x") (intToExpr 10)) (Seq (Assign "x" (Plus (Id "x") (intToExpr 1))) (Print (Id "x"))))
 
