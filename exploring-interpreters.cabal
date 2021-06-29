@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                exploring-interpreters
-version:             0.3.1.0
+version:             0.3.2.0
 synopsis:            A generic exploring interpreter for exploratory programming
 -- synopsis:
 -- description:

@@ -9,3 +9,8 @@
 
 ## 0.3.1.0 -- 2021-04-18
 * This version adds the 'leaves' function to the exploring interpreter.
+
+## 0.3.2.0 -- 2021-06-29
+* This version adds functionality to support exporting and importing of execution environments.
+This functionality is provided via the 'toExport' and 'fromExport' functions.
+* Furthermore, this version also exports the initial reference.
