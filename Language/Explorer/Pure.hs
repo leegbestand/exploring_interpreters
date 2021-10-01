@@ -21,6 +21,8 @@ module Language.Explorer.Pure
     , getPathsFromTo
     , getPathFromTo
     , executionGraph
+    , fromExport
+    , toExport
     ) where
 
 import qualified Language.Explorer.Monadic as ExplorerM

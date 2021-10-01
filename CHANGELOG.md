@@ -14,3 +14,6 @@
 * This version adds functionality to support exporting and importing of execution environments.
 This functionality is provided via the 'toExport' and 'fromExport' functions.
 * Furthermore, this version also exports the initial reference.
+
+## 0.3.2.1 -- 2021-01-10
+* Add the toExport and fromExport functions to the exported functions in the pure module.
