@@ -201,5 +201,12 @@ toExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))])
 toExport exp = (currRef exp, IntMap.toList $ cmap exp, labEdges $ execEnv exp)
 
 fromExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))]) -> Explorer p m c o
-fromExport exp (curr, nds, edgs) = exp { genRef = findMax nds, currRef = curr, cmap = IntMap.fromList nds, execEnv = mkGraph (map (\(x, _) -> (x, x)) nds) edgs }
+fromExport exp (curr, nds, edgs) = exp { genRef = findMax nds,
+                                         config = findCurrentConf curr nds,
+                                         currRef = curr, 
+                                         cmap = IntMap.fromList nds, 
+                                         execEnv = mkGraph (map (\(x, _) -> (x, x)) nds) edgs }
   where findMax l = maximum $ map fst l
+        findCurrentConf curr nds = case lookup curr nds of
+                                     Just conf -> conf
+                                     Nothing   -> error("no config found")
