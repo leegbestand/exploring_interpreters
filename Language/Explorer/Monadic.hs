@@ -201,4 +201,5 @@ toExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))])
 toExport exp = (currRef exp, IntMap.toList $ cmap exp, labEdges $ execEnv exp)
 
 fromExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))]) -> Explorer p m c o
-fromExport exp (curr, nds, edgs) = exp { currRef = curr, cmap = IntMap.fromList nds, execEnv = mkGraph (map (\(x, _) -> (x, x)) nds) edgs }
+fromExport exp (curr, nds, edgs) = exp { genRef = findMax nds, currRef = curr, cmap = IntMap.fromList nds, execEnv = mkGraph (map (\(x, _) -> (x, x)) nds) edgs }
+  where findMax l = maximum $ map fst l

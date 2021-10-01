@@ -17,3 +17,6 @@ This functionality is provided via the 'toExport' and 'fromExport' functions.
 
 ## 0.3.2.1 -- 2021-01-10
 * Add the toExport and fromExport functions to the exported functions in the pure module.
+
+## 0.4.0.0 -- 2021-01-10
+* fromExport function now correctly determines the referece to use for generation of new nodes.
