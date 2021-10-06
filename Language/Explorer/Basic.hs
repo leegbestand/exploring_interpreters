@@ -1,14 +1,12 @@
+{-# LANGUAGE ConstraintKinds #-}
+
 module Language.Explorer.Basic
     ( Explorer
+    , mkExplorer
     , execute
     , executeAll
     , revert
-    , dynamicRevert
     , ExplorerM.toTree
-    , mkExplorerStack
-    , mkExplorerTree
-    , mkExplorerGraph
-    , mkExplorerGSS
     , config
     , currRef
     , Ref
@@ -19,7 +17,8 @@ module Language.Explorer.Basic
     , getPathsFromTo
     , getPathFromTo
     , executionGraph
-    , ExplorerM.initialRef
+    , fromExport
+    , toExport
     ) where
 
 import qualified Language.Explorer.Monadic as ExplorerM
@@ -36,6 +35,10 @@ import Data.Graph.Inductive.Graph (emap)
 -- the same.
 type Ref = ExplorerM.Ref
 type Explorer a b = ExplorerM.Explorer a Identity b ()
+type BasicLanguage p c = Eq p
+
+mkExplorer :: BasicLanguage p c => Bool -> (c -> c -> Bool) -> (p -> c -> Maybe c) -> c -> Explorer p c
+mkExplorer shadow eqfunc definterp initialConf = ExplorerM.mkExplorer shadow eqfunc (wrap definterp) initialConf
 
 currRef :: Explorer a b -> Ref
 currRef = ExplorerM.currRef
@@ -50,21 +53,11 @@ deref = ExplorerM.deref
 wrap :: Monad m => (a -> b -> Maybe b) -> a -> b -> m (Maybe b, ())
 wrap def p e = return $ (def p e, ())
 
--- Constructor for a exploring interpreter.
-mkExplorerStack, mkExplorerTree, mkExplorerGraph, mkExplorerGSS :: (Show a, Eq a, Eq b) => (a -> b -> Maybe b) -> b -> Explorer a b
-mkExplorerStack definterp conf = ExplorerM.mkExplorerStack (wrap definterp) conf
-mkExplorerTree definterp conf = ExplorerM.mkExplorerTree (wrap definterp) conf
-mkExplorerGraph definterp conf = ExplorerM.mkExplorerGraph (wrap definterp) conf
-mkExplorerGSS definterp conf = ExplorerM.mkExplorerGSS (wrap definterp) conf
-
-execute :: (Eq c, Eq p) =>  p -> Explorer p c -> Explorer p c
+execute :: BasicLanguage p c => p -> Explorer p c -> Explorer p c
 execute p e = fst $ runIdentity $ ExplorerM.execute p e
 
-executeAll :: (Eq c, Eq p) => [p] -> Explorer p c -> Explorer p c
+executeAll :: BasicLanguage p c => [p] -> Explorer p c -> Explorer p c
 executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
-
-dynamicRevert :: Bool -> Ref -> Explorer p c -> Maybe (Explorer p c)
-dynamicRevert = ExplorerM.dynamicRevert
 
 revert :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
 revert = ExplorerM.revert
@@ -87,7 +80,7 @@ getPathsFromTo e s t = map (map removeOutput) $ ExplorerM.getPathsFromTo e s t
 getPathFromTo :: Explorer p c -> Ref -> Ref -> [((Ref, c), p, (Ref, c))]
 getPathFromTo e s t = map removeOutput $ ExplorerM.getPathFromTo e s t
 
-executionGraph :: Explorer p c -> (Ref, [Ref], [((Ref, c), p, (Ref, c))])
+executionGraph :: Explorer p c -> ((Ref, c), [(Ref, c)], [((Ref, c), p, (Ref, c))])
 executionGraph e = (curr, nodes, map removeOutput graph)
   where
     (curr, nodes, graph) = ExplorerM.executionGraph e
@@ -96,7 +89,11 @@ leaves :: Explorer p c -> [(Ref, c)]
 leaves = ExplorerM.leaves
 
 toExport :: Explorer p c -> (Ref, [(Ref, c)], [(Ref, Ref, p)])
-toExport exp = let (curr, nds, edges) = ExplorerM.toExport exp in (curr, nds, map (\(r1, r2, (p, o)) -> (r1, r2, p)) edges)
+toExport = removeOut . ExplorerM.toExport
+  where 
+    removeOut (c, nodes, edges) = (c, nodes, map (\(s, t, (p, _)) -> (s, t, p)) edges)
 
 fromExport :: Explorer p c -> (Ref, [(Ref, c)], [(Ref, Ref, p)]) -> Explorer p c
-fromExport exp (curr, nds, edgs) = ExplorerM.fromExport exp (curr, nds, map (\(r1, r2, p) -> (r1, r2, (p, ()))) edgs)
+fromExport e exported = ExplorerM.fromExport e (addOut exported)
+  where
+    addOut (c, nodes, edges) = (c, nodes, map (\(s, t, p) -> (s, t, (p, ()))) edges)

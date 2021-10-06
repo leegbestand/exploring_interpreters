@@ -2,6 +2,7 @@ module Whilelang where
 
 import qualified Data.Map as Map
 import Data.List
+import Data.Maybe
 import Data.Graph.Inductive (emap)
 import Control.Monad.Trans.Writer.Lazy
 import Control.Monad.Trans.State.Lazy
@@ -135,48 +136,62 @@ definterpM c cfg = do
 do_ :: Command -> WhileExplorer -> IO WhileExplorer
 do_ (Seq c1 c2) e = do_ c1 e >>= do_ c2
 do_ p e = do
-    let e' = E.execute p e 
+    let e' = E.execute p e
     putStr $ unlines $ cfgOutput (E.config e') \\ cfgOutput (E.config e)
     return e'
 
 do_2 :: Command -> WhileExplorerM -> IO WhileExplorerM
-do_2 (Seq c1 c2) e = do_2 c1 e >>= do_2 c2 
+do_2 (Seq c1 c2) e = do_2 c1 e >>= do_2 c2
 do_2 p e = fst <$> EM.execute p e
 
 do_3 :: Command -> (WhileExplorerO, [String]) -> (WhileExplorerO, [String])
-do_3 (Seq c1 c2) e = do_3 c2 $ do_3 c1 e 
+do_3 (Seq c1 c2) e = do_3 c2 $ do_3 c1 e
 do_3 p (e, o) = (e', o ++ o')
   where (e', o') = EP.execute p e
 
 start :: IO WhileExplorer
-start = return whileGraph
+start = return whileExplorer
 
-startM :: IO WhileExplorerM
-startM = return whileGraphM
+-- startM :: IO WhileExplorerM
+-- startM = return whileTree
 
-startO :: WhileExplorerO
-startO = whileGraphO
+-- startO :: WhileExplorerO
+-- startO = whileGraphO
 
 session1 :: IO WhileExplorer
 session1 = start >>=
-  do_ (assign "x" (intToExpr 1)) >>= 
-  do_ (assign "y" (Id "x")) >>= 
-  do_ (Print (Id "y"))
+  do_ (assign "x" (intToExpr 1)) >>=
+  do_ (assign "y" (Id "x")) >>=
+  do_ (assign "x" (intToExpr 1)) >>=
+  do_ (Print (Id "y")) >>=
+  do_ (Print (Id "x")) . fromJust . EM.jump 2 >>=
+  do_ (assign "z" (intToExpr 100)) >>=
+  do_ (Print (Id "z"))
 
 
--- When using sharing, this results in 3 configurations and not 4,
--- since the IO effect is hidden in the monad and not part of the
--- configurations anymore.
-session2 :: IO WhileExplorerM
-session2 = startM >>=
-  do_2 (assign "x" (intToExpr 1)) >>= 
-  do_2 (assign "y" (Id "x")) >>= 
-  do_2 (Print (Id "y"))
+sessionS :: IO WhileExplorer
+sessionS = start >>=
+  do_ (assign "x" (intToExpr 1)) >>=
+  do_ (assign "y" (Id "x")) >>=
+  do_ (assign "x" (intToExpr 1)) >>=
+  do_ (assign "z" (intToExpr 20)) >>=
+  do_ (assign "y" (Id "x"))
 
 
-session3 :: (WhileExplorerO, [String])
-session3 =
-  do_3 (Print (Id "y")) $ do_3 (assign "y" (Id "x")) $ do_3 (assign "x" (intToExpr 1)) (startO, [])
+
+-- -- When using sharing, this results in 3 configurations and not 4,
+-- -- since the IO effect is hidden in the monad and not part of the
+-- -- configurations anymore.
+-- session2 :: IO WhileExplorerM
+-- session2 = startM >>=
+--   do_2 (assign "x" (intToExpr 1)) >>=
+--   do_2 (assign "y" (Id "x")) >>=
+--   do_2 (Print (Id "y"))
+
+
+-- session3 :: (WhileExplorerO, [String])
+-- session3 =
+--   do_3 (Print (Id "y")) $ do_3 (assign "y" (Id "x")) $ do_3 (assign "x" (intToExpr 1)) (startO, [])
 
 -- Below are some helpers to create a Command and fully evaluate it.
 -- Example:
@@ -214,20 +229,8 @@ assign = Assign
 wseq :: Command -> Command -> Command
 wseq = Seq
 
-whileGraph :: WhileExplorer
-whileGraph = E.mkExplorerGraph definterp initialConfig
-
-whileGraphM :: WhileExplorerM
-whileGraphM = EM.mkExplorerGraph (\p c -> (\c -> (Just c,())) <$> definterpM p c) initialConfig
-
-whileGraphO :: WhileExplorerO
-whileGraphO = EP.mkExplorerGraph definterpO initialConfig
-
-whileTree :: WhileExplorer
-whileTree = E.mkExplorerTree definterp initialConfig
-
-whileStack :: WhileExplorer 
-whileStack = E.mkExplorerStack definterp initialConfig
+whileExplorer :: WhileExplorer
+whileExplorer = E.mkExplorer True (==) definterp initialConfig
 
 whileExample = Seq (Assign "x" (intToExpr 0)) (while (Leq (Id "x") (intToExpr 10)) (Seq (Assign "x" (Plus (Id "x") (intToExpr 1))) (Print (Id "x"))))
 

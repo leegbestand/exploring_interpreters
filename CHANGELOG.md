@@ -15,8 +15,15 @@
 This functionality is provided via the 'toExport' and 'fromExport' functions.
 * Furthermore, this version also exports the initial reference.
 
-## 0.3.2.1 -- 2021-01-10
+## 0.3.2.1 -- 2021-10-01
 * Add the toExport and fromExport functions to the exported functions in the pure module.
 
-## 0.4.0.0 -- 2021-01-10
+## 0.4.0.0 -- 2021-10-01
 * fromExport function now correctly determines the referece to use for generation of new nodes.
+
+## 1.0.0.0 -- 2021-10-06
+* Change explorer model to the new model where the exploration is always reported
+by a tree and sharing is possible via the optional shadow graph.
+Furthermore, the *jump* action is introduced to allow jumping to any node in the tree without the 
+destructive property. In addition, the *revert* action is now always destructive and can only operate 
+on the current trace.
