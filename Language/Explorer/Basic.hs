@@ -3,6 +3,7 @@
 module Language.Explorer.Basic
     ( Explorer
     , mkExplorer
+    , mkExplorerNoSharing
     , execute
     , executeAll
     , revert
@@ -39,6 +40,9 @@ type BasicLanguage p c = Eq p
 
 mkExplorer :: BasicLanguage p c => Bool -> (c -> c -> Bool) -> (p -> c -> Maybe c) -> c -> Explorer p c
 mkExplorer shadow eqfunc definterp initialConf = ExplorerM.mkExplorer shadow eqfunc (wrap definterp) initialConf
+
+mkExplorerNoSharing :: BasicLanguage p c => (p -> c -> Maybe c) -> c -> Explorer p c
+mkExplorerNoSharing = mkExplorer False (const . const $ False)
 
 currRef :: Explorer a b -> Ref
 currRef = ExplorerM.currRef

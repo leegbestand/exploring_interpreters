@@ -3,6 +3,7 @@
 module Language.Explorer.Pure
     ( Explorer
     , mkExplorer
+    , mkExplorerNoSharing
     , execute
     , executeAll
     , revert
@@ -37,6 +38,9 @@ type PureLanguage p c o = (Eq p, Eq o, Monoid o)
 
 mkExplorer :: PureLanguage p c o => Bool -> (c -> c -> Bool) -> (p -> c -> (Maybe c, o)) -> c -> Explorer p c o
 mkExplorer shadowing eqfunc definterp initialConf = ExplorerM.mkExplorer shadowing eqfunc (wrap definterp) initialConf
+
+mkExplorerNoSharing :: PureLanguage p c o => (p -> c -> (Maybe c, o)) -> c -> Explorer p c o
+mkExplorerNoSharing = mkExplorer False (const . const $ False)
 
 currRef :: Explorer a b o -> Ref
 currRef = ExplorerM.currRef

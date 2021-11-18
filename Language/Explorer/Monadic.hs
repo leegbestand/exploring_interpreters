@@ -5,6 +5,7 @@
 module Language.Explorer.Monadic
     ( Explorer
     , mkExplorer
+    , mkExplorerNoSharing
     , execute
     , executeAll
     , revert

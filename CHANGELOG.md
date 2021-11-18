@@ -27,3 +27,6 @@ by a tree and sharing is possible via the optional shadow graph.
 Furthermore, the *jump* action is introduced to allow jumping to any node in the tree without the 
 destructive property. In addition, the *revert* action is now always destructive and can only operate 
 on the current trace.
+* Add the Tools module.
+This module includes an implementation of the exploring interpreter protocol and an implementation
+of an language parametric REPL.
