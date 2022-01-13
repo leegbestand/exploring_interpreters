@@ -158,14 +158,14 @@ cleanShadowEnv True nds g = shadowEnv''
 
 data RevertableStatus = ContinueRevert | StopRevert deriving Show
 
-findRevertableNodes gr source target = 
+findRevertableNodes gr source target =
   case findNextNodeInPath gr source target of
     (Just node) -> fst $ findRevertableNodes' gr node target
     Nothing     -> []
-  where 
-    findNextNodeInPath gr source target = find (\n -> target `elem` (reachable n gr)) (suc gr source) 
-    findRevertableNodes' gr source target 
-      | source == target = if outdeg gr source > 1 then ([], StopRevert) else ([source], ContinueRevert) 
+  where
+    findNextNodeInPath gr source target = find (\n -> target `elem` (reachable n gr)) (suc gr source)
+    findRevertableNodes' gr source target
+      | source == target = if outdeg gr source > 1 then ([], StopRevert) else ([source], ContinueRevert)
       | otherwise = case findNextNodeInPath gr source target of
         (Just node) -> case findRevertableNodes' gr node target of
           (res, StopRevert) -> (res, StopRevert)
@@ -256,8 +256,8 @@ toExport exp = (currRef exp, IntMap.toList $ cmap exp, labEdges $ execEnv exp)
 fromExport :: Explorer p m c o -> (Ref, [(Ref, c)], [(Ref, Ref, (p, o))]) -> Explorer p m c o
 fromExport exp (curr, nds, edgs) = exp { genRef = findMax nds,
                                          config = findCurrentConf curr nds,
-                                         currRef = curr, 
-                                         cmap = IntMap.fromList nds, 
+                                         currRef = curr,
+                                         cmap = IntMap.fromList nds,
                                          execEnv = mkGraph (map (\(x, _) -> (x, x)) nds) edgs }
   where findMax l = maximum $ map fst l
         findCurrentConf curr nds = case lookup curr nds of

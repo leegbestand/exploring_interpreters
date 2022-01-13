@@ -94,7 +94,7 @@ leaves = ExplorerM.leaves
 
 toExport :: Explorer p c -> (Ref, [(Ref, c)], [(Ref, Ref, p)])
 toExport = removeOut . ExplorerM.toExport
-  where 
+  where
     removeOut (c, nodes, edges) = (c, nodes, map (\(s, t, (p, _)) -> (s, t, p)) edges)
 
 fromExport :: Explorer p c -> (Ref, [(Ref, c)], [(Ref, Ref, p)]) -> Explorer p c
