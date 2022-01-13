@@ -1,16 +1,16 @@
-module Language.Explorer.Tools.REPL where 
+module Language.Explorer.Tools.REPL where
 
 import Control.Monad.IO.Class (MonadIO(..))
 import Language.Explorer.Monadic
     (Explorer(config), execute, revert, jump, toTree)
-import qualified System.Console.Readline as Rl
+import qualified System.Console.Haskeline as Hl
 import Data.Tree (drawTree)
 import Data.Maybe (fromJust, isNothing)
 import Data.Char (isSpace)
-import Data.List (find, isPrefixOf) 
+import Data.List (find, isPrefixOf)
 import Text.Read (readMaybe)
 import Control.Arrow (Arrow(first))
-
+import Control.Monad.Trans
 
 
 type MetaTable p m c o = [(String, String -> Explorer p m c o -> m (Explorer p m c o))]
@@ -51,22 +51,22 @@ metaTable = [
 constructMetaTable :: MonadIO m => String -> [(String, String -> Explorer p m c o -> m (Explorer p m c o))]
 constructMetaTable prefix = map (first (prefix ++ )) metaTable
 
-repl :: (Eq p, Eq o, Monoid o, MonadIO m) => Repl p m c o
-repl prompt parser metaPrefix metaTable metaHandler outputHandler ex = do
-  minput <- liftIO . Rl.readline . prompt $ ex
-  case minput of
-    (Just input) -> do
-      liftIO $ Rl.addHistory input
-      if metaPrefix `isPrefixOf` input then runMeta input else runExec input
-    Nothing -> return ()
-  where
-    repl' = repl prompt parser metaPrefix metaTable metaHandler outputHandler
-    runMeta input =
-      let (pcmd, args) = break isSpace input in
-        case find (\(cmd, _) -> (metaPrefix ++ cmd) == pcmd) metaTable of
-          Just (_, f) -> f args ex >>= repl'
-          Nothing -> metaHandler input ex >>= repl'
-    runExec input =
-      case parser input (config ex) of
-        (Just program) -> execute program ex >>= \(newEx, out) -> (outputHandler out >> repl' newEx)
-        Nothing -> repl' ex
+repl :: (Eq p, Eq o, Monoid o, MonadIO m, Hl.MonadException m) => Repl p m c o
+repl prompt parser metaPrefix metaTable metaHandler outputHandler ex =
+  Hl.runInputT Hl.defaultSettings (loop ex)
+    where
+    loop ex = do
+      minput <- Hl.getInputLine . prompt $ ex
+      case minput of
+        (Just input) -> lift (if metaPrefix `isPrefixOf` input then runMeta input else runExec input) >>= loop
+        Nothing -> return ()
+      where
+        runMeta input =
+          let (pcmd, args) = break isSpace input in
+            case find (\(cmd, _) -> (metaPrefix ++ cmd) == pcmd) metaTable of
+              Just (_, f) -> f args ex
+              Nothing -> metaHandler input ex
+        runExec input =
+          case parser input (config ex) of
+            (Just program) -> execute program ex >>= \(newEx, out) -> outputHandler out >> return newEx
+            Nothing -> return ex

@@ -11,21 +11,24 @@ import Control.Monad.Identity
 import qualified Language.Explorer.Basic as E
 import qualified Language.Explorer.Pure as EP
 import qualified Language.Explorer.Monadic as EM
+import qualified Language.Explorer.Tools.REPL as R
+import Language.Explorer.Basic (mkExplorerNoSharing)
 
 
-data Literal = LitBool Bool | LitInt Integer deriving (Eq)
+
+data Literal = LitBool Bool | LitInt Integer deriving (Eq, Read)
 instance Show Literal where
     show (LitBool b) = show b
     show (LitInt i) = show i
 
-data Expr = Leq Expr Expr | Plus Expr Expr | LitExpr Literal | Id String deriving (Eq)
+data Expr = Leq Expr Expr | Plus Expr Expr | LitExpr Literal | Id String deriving (Eq, Read)
 instance Show Expr where
     show (Leq e1 e2) = show e1 ++ "<=" ++ show e2
     show (Plus e1 e2) = show e1 ++ "+" ++ show e2
     show (LitExpr lit) = show lit
     show (Id s) = s
 
-data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done deriving (Eq)
+data Command = Seq Command Command | Assign String Expr | Print Expr | While Expr Expr Command | Done deriving (Eq, Read)
 instance Show Command where
     show (Print e1) = "print(" ++ show e1 ++ ")"
     show Done = "Done"
@@ -124,12 +127,17 @@ definterpO c cfg = (Just $ cfg {cfgStore = newstore}, newout)
 
 
 -- Simulate doing IO in the definitional interpreter.
-definterpM :: Command -> Config -> IO Config
+definterpM :: Command -> Config -> IO (Maybe Config, ())
 definterpM c cfg = do
     mapM putStrLn newout
-    return cfg {cfgStore = newstore, cfgOutput = []}
+    return (Just $ cfg {cfgStore = newstore, cfgOutput = []}, ())
     where ((_, newout), newstore) = runState (runWriterT (evalCommand' c)) (cfgStore cfg)
 
+
+parser :: String -> c -> Maybe Command
+parser s _ = Just (read s :: Command)
+
+repl = R.repl (const "While> ") parser ":" R.metaTable  (\_ ex -> return ex) (\_ -> return ()) (EM.mkExplorerNoSharing definterpM initialConfig)
 
 -- whileLang = (Command, Config, initialConfig, definterp)
 --
