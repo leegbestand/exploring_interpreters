@@ -33,3 +33,6 @@ of an language parametric REPL.
 
 ## 1.2.0.0 -- 2022-01-13
 * Change the readline dependency to haskeline.
+
+## 1.3.0.0 -- 2022-01-13
+* Bump and freeze haskeline dependency.
