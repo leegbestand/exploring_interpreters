@@ -30,3 +30,6 @@ on the current trace.
 * Add the Tools module.
 This module includes an implementation of the exploring interpreter protocol and an implementation
 of an language parametric REPL.
+
+## 1.2.0.0 -- 2022-01-13
+* Change the readline dependency to haskeline.
