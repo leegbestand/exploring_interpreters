@@ -36,3 +36,6 @@ of an language parametric REPL.
 
 ## 1.3.0.0 -- 2022-01-13
 * Bump and freeze haskeline dependency.
+
+## 1.5.0.0 -- 2024-01-19
+* Bump the text dependency, and bump + bound the aeson dependency.
