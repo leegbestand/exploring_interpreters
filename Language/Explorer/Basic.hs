@@ -7,7 +7,9 @@ module Language.Explorer.Basic
     , execute
     , executeAll
     , revert
+    , jump
     , ExplorerM.toTree
+    , incomingEdges
     , config
     , currRef
     , Ref
@@ -65,6 +67,9 @@ executeAll p e = fst $ runIdentity $ ExplorerM.executeAll p e
 
 revert :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
 revert = ExplorerM.revert
+
+jump :: ExplorerM.Ref -> Explorer p c -> Maybe (Explorer p c)
+jump = ExplorerM.jump
 
 removeOutput :: ((Ref, c), (p, o), (Ref, c)) -> ((Ref, c), p, (Ref, c))
 removeOutput (s, (p, _), t) = (s, p, t)

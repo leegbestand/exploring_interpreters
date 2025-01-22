@@ -7,6 +7,7 @@ module Language.Explorer.Pure
     , execute
     , executeAll
     , revert
+    , jump
     , ExplorerM.toTree
     , incomingEdges
     , config
@@ -62,6 +63,9 @@ executeAll p e = runIdentity $ ExplorerM.executeAll p e
 
 revert :: ExplorerM.Ref -> Explorer p c o -> Maybe (Explorer p c o)
 revert = ExplorerM.revert
+
+jump :: ExplorerM.Ref -> Explorer p c o -> Maybe (Explorer p c o)
+jump = ExplorerM.jump
 
 incomingEdges :: Ref -> Explorer p c o -> [((Ref, c), (p, o), (Ref, c))]
 incomingEdges = ExplorerM.incomingEdges
