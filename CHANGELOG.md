@@ -39,3 +39,6 @@ of an language parametric REPL.
 
 ## 1.5.0.0 -- 2024-01-19
 * Bump the text dependency, and bump + bound the aeson dependency.
+
+## 1.6.0.0 -- 2025-02-21
+* Bump several of the dependencies and loosen some of the constraints.
