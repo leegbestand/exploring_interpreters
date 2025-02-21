@@ -404,8 +404,7 @@ serve port ex parser = withSocketsDo $ do
         bind sock (addrAddress addr)
         -- If the prefork technique is not used,
         -- set CloseOnExec for the security reasons.
-        fd <- fdSocket sock
-        setCloseOnExecIfNeeded fd
+        withFdSocket sock setCloseOnExecIfNeeded
         listen sock 10
         return sock
     loop sock = forever $ do
