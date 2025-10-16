@@ -25,6 +25,8 @@ library
       Language.Explorer.Pure,
       Language.Explorer.Tools.REPL,
       Language.Explorer.Tools.Protocol
+      Language.Explorer.GStorage
+      Data.Storage
   other-modules:
       Language.Explorer.Basic
   -- other-extensions:
