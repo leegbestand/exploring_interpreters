@@ -15,7 +15,7 @@ import Control.Monad.Catch
 
 
 type MetaTable p m c o = [(String, String -> Explorer p m c o -> m (Explorer p m c o))]
-type RParser p c = String -> c -> Maybe p
+type RParser p c = String -> c -> Either String p
 type Prompt p m c o = Explorer p m c o -> String
 type MetaHandler p m c o = String -> Explorer p m c o -> m (Explorer p m c o)
 type OutputHandler m o = o -> m ()
@@ -69,5 +69,5 @@ repl prompt parser metaPrefix metaTable metaHandler outputHandler ex =
               Nothing -> metaHandler input ex
         runExec input =
           case parser input (config ex) of
-            (Just program) -> execute program ex >>= \(newEx, out) -> outputHandler out >> return newEx
-            Nothing -> return ex
+            Right program -> execute program ex >>= \(newEx, out) -> outputHandler out >> return newEx
+            Left err      -> liftIO (putStrLn err) >> return ex
